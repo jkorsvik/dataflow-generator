@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Interactive data flow visualization tool for database dumps"
 readme = "README.md"
 authors = [
-    { name = "DNB", email = "jon-mikkel.ryen.korsvik@dnb.no" }
+    { name = "Jon-Mikkel Korsvik", email = "jkorsvik@outlook.com" }
 ]
 license = { text = "MIT" }
 classifiers = [
