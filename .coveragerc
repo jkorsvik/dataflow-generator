@@ -1,0 +1,19 @@
+[run]
+source = src
+branch = True
+omit = src/plotly_vis.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    pass
+    raise ImportError
+fail_under = 40
+precision = 2
+show_missing = False
+
+[html]
+directory = coverage_html

@@ -1,0 +1,71 @@
+image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+variables:
+  UV_CACHE_DIR: "$CI_PROJECT_DIR/.uv-cache"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.pip-cache"
+  BRANCH: "${CI_COMMIT_REF_NAME//\//-}"
+  FF_USE_FASTZIP: "true"
+  CACHE_COMPRESSION_LEVEL: "fast"
+  ARTIFACT_COMPRESSION_LEVEL: "fast"
+
+cache:
+  - key: "uv-cache-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .uv-cache/
+  - key: "pip-cache-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .pip-cache/
+
+stages:
+  - lint
+  - test
+  - coverage
+  # - deploy  # Remove or comment out deploy stage for now
+
+before_script:
+  - uv venv
+  - source .venv/bin/activate
+  - uv sync --dev
+
+lint:
+  stage: lint
+  script:
+    - mypy src/
+  allow_failure: true
+
+test:
+  stage: test
+  script:
+    - python -m pytest tests/ --cov=src --cov-report=xml
+  artifacts:
+    when: on_success
+    paths:
+      - coverage.xml
+      - .coverage  # Add the .coverage file as an artifact
+
+coverage:
+  stage: coverage
+  script:
+    - uv pip install coverage-badge anybadge
+    - coverage-badge -o coverage.svg
+    - |
+      COVERAGE=$(coverage report | grep TOTAL | awk '{print $4}' | sed 's/%//')
+      if [ "$COVERAGE" -lt 40 ]; then
+        echo "Coverage below threshold: $COVERAGE%"
+        exit 1
+      fi
+    - anybadge --label=tests --value=passing --file=tests.svg --color=green
+  artifacts:
+    when: on_success
+    paths:
+      - coverage.svg
+      - tests.svg
+
+# deploy:
+#   stage: deploy
+#   script:
+#     - echo "Deploying application..."
+#     - echo "Badges are uploaded as pipeline artifacts and referenced in the README. No local move needed."
+#     - ls -l
+#   only:
+#     - main

@@ -1,0 +1,72 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "data-flow-generator"
+version = "0.1.0"
+description = "Interactive data flow visualization tool for database dumps"
+readme = "README.md"
+authors = [
+    { name = "DNB", email = "jon-mikkel.ryen.korsvik@dnb.no" }
+]
+license = { text = "MIT" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "colorama==0.4.6",
+    "kaleido==0.2.1",
+    "narwhals==1.33.0",
+    "networkx==3.3",
+    "numpy>=2.2.4",
+    "packaging==24.2",
+    "plotly==6.0.1",
+    "python-dotenv==1.0.1",
+    "pyvis>=0.3.2",
+    "rapidfuzz==3.6.1",
+    "readchar==4.1.0",
+    "questionary>=2.0.1",
+    "mypy>=1.15.0",
+    "pytest-cov==6.1.0",
+    "coverage-badge>=1.1.2",
+    "anybadge>=1.16.0",
+    "pandas-stubs>=2.2.3.250308",
+    "types-pygments>=2.19.0.20250305",
+    "types-colorama>=0.4.15.20240311",
+    "types-networkx>=3.4.2.20250319",
+]
+
+[project.scripts]
+dataflow = "src.dataflow:main"
+
+[project.urls]
+Homepage = "https://github.com/dnb-oss/data-flow-generator"
+Documentation = "https://github.com/dnb-oss/data-flow-generator/blob/main/README.md"
+
+[tool.setuptools]
+packages = ["src"]
+
+[tool.coverage.run]
+omit = ["src/plotly_vis.py"]
+
+[[tool.uv.index]]
+name = "ipa-nexus-group"
+url = "https://nexus.tech.dnb.no/nexus/repository/pypi-group/simple"
+
+[[tool.uv.index]]
+name = "ipa-nexus-simple"
+url = "https://nexus.tech.dnb.no/nexus/repository/ipa-pypi/simple"
+
+
+[dependency-groups]
+dev = [
+    "mypy>=1.15.0",
+    "pytest>=8.3.5",
+    "pytest-cov>=4.0",
+]
