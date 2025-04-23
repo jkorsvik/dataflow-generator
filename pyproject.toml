@@ -21,11 +21,11 @@ classifiers = [
 requires-python = ">=3.10"
 dependencies = [
     "colorama==0.4.6",
-    "kaleido==0.2.1",
+    "kaleido>=0.2.1",
     "narwhals==1.33.0",
     "networkx==3.3",
     "numpy>=2.2.4",
-    "packaging==24.2",
+    "packaging>=24.2",
     "plotly==6.0.1",
     "python-dotenv==1.0.1",
     "pyvis>=0.3.2",
@@ -46,22 +46,14 @@ dependencies = [
 dataflow = "src.dataflow:main"
 
 [project.urls]
-Homepage = "https://github.com/dnb-oss/data-flow-generator"
-Documentation = "https://github.com/dnb-oss/data-flow-generator/blob/main/README.md"
+Homepage = "https://github.com/jkorsvik/dataflow-generator"
+Documentation = "https://github.com/jkorsvik/dataflow-generator/blob/main/README.md"
 
 [tool.setuptools]
 packages = ["src"]
 
 [tool.coverage.run]
 omit = ["src/plotly_vis.py"]
-
-[[tool.uv.index]]
-name = "ipa-nexus-group"
-url = "https://nexus.tech.dnb.no/nexus/repository/pypi-group/simple"
-
-[[tool.uv.index]]
-name = "ipa-nexus-simple"
-url = "https://nexus.tech.dnb.no/nexus/repository/ipa-pypi/simple"
 
 
 [dependency-groups]
