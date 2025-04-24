@@ -45,6 +45,7 @@ dependencies = [
 
 [project.scripts]
 dataflow = "src.dataflow:main"
+data-flow-generator = "src.dataflow:main"
 
 [project.urls]
 Homepage = "https://github.com/jkorsvik/dataflow-generator"

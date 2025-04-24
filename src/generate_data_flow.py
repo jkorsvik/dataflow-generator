@@ -548,6 +548,10 @@ def parse_vql(
         if db and node_info.get("type") != "cte_view":
             final_database_stats[db] = final_database_stats.get(db, 0) + 1
 
+    # Ensure json_structure directory exists before writing files
+    json_dir = "json_structure"
+    if not os.path.exists(json_dir):
+        os.makedirs(json_dir)
     # Write edges and nodes to json dump
     with open("json_structure/edges.json", "w", encoding="utf-8") as f:
         json.dump(edges, f, indent=4)
