@@ -1,7 +1,7 @@
 # Data Flow Visualization Tool
 
-
 [![CI](https://github.com/jkorsvik/dataflow/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jkorsvik/dataflow/actions/workflows/ci.yml)
+[![Tests](https://github.com/jkorsvik/dataflow/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/jkorsvik/dataflow/actions/workflows/test.yml)
 [![Coverage](https://github.com/jkorsvik/dataflow/raw/main/coverage.svg)](https://github.com/jkorsvik/dataflow/actions/workflows/ci.yml)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
