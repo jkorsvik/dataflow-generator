@@ -1,8 +1,8 @@
 # Data Flow Visualization Tool
 
 
-[![pipeline status](https://gitlab.tech.dnb.no/dnb/ipa-products/initiatives/infa-insight-factory/misc/data-flow-generator/badges/main/pipeline.svg)](https://gitlab.tech.dnb.no/dnb/ipa-products/initiatives/infa-insight-factory/misc/data-flow-generator/-/commits/main)
-[![coverage report](https://gitlab.tech.dnb.no/dnb/ipa-products/initiatives/infa-insight-factory/misc/data-flow-generator/-/jobs/artifacts/main/raw/coverage.svg?job=coverage)](https://gitlab.tech.dnb.no/dnb/ipa-products/initiatives/infa-insight-factory/misc/data-flow-generator/-/commits/main)
+[![CI](https://github.com/jkorsvik/dataflow/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jkorsvik/dataflow/actions/workflows/ci.yml)
+[![Coverage](https://github.com/jkorsvik/dataflow/raw/main/coverage.svg)](https://github.com/jkorsvik/dataflow/actions/workflows/ci.yml)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](https://www.python.org/)
