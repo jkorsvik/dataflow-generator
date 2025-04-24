@@ -42,12 +42,12 @@ rm -rf .venv && source setup.sh
 
 - Install from PyPI:
 ```sh
-pip install data-flow-generator
+uv pip install data-flow-generator
 ```
 
 - Install for current user:
 ```sh
-pip install --user data-flow-generator
+uv pip install --user data-flow-generator
 ```
 
 ## Usage
