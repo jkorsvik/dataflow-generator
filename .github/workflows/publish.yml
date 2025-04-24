@@ -1,0 +1,31 @@
+name: Publish Python Package
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Build and publish Python distributions to PyPI
+    runs-on: ubuntu-latest
+    container: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+    environment: pypi
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build tool
+        run: uv pip install build --system
+
+      - name: Build package
+        run: python -m build
+
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
