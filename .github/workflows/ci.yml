@@ -10,6 +10,13 @@ jobs:
     container: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
     steps:
       - uses: actions/checkout@v4
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('**/uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
       - name: Install dependencies
         run: uv sync --dev
       - name: Run mypy
@@ -22,6 +29,13 @@ jobs:
     needs: lint
     steps:
       - uses: actions/checkout@v4
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('**/uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
       - name: Install dependencies
         run: uv sync --dev
       - name: Run tests
@@ -41,23 +55,28 @@ jobs:
     needs: test
     steps:
       - uses: actions/checkout@v4
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('**/uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
       - name: Install dependencies
-        run: |
-          uv sync --dev
-          uv pip install coverage-badge anybadge
+        run: uv sync --dev
       - name: Download coverage artifacts
         uses: actions/download-artifact@v4
         with:
           name: coverage-artifacts
       - name: Generate coverage badge
         run: |
-          coverage-badge -o coverage.svg
-          COVERAGE=$(coverage report | grep TOTAL | awk '{print $4}' | sed 's/%//')
+          uv run coverage-badge -o coverage.svg
+          COVERAGE=$(uv run coverage report | grep TOTAL | awk '{print $4}' | sed 's/%//')
           if [ "$COVERAGE" -lt 40 ]; then
             echo "Coverage below threshold: $COVERAGE%"
             exit 1
           fi
-          anybadge --label=tests --value=passing --file=tests.svg --color=green
+          uv run anybadge --label=tests --value=passing --file=tests.svg --color=green
       - name: Upload badge artifacts
         uses: actions/upload-artifact@v4
         with:
