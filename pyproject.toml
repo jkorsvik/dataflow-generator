@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "data-flow-generator"
-version = "0.1.5"
+version = "0.1.6"
 description = "Interactive data flow visualization tool for database dumps"
 readme = "README.md"
 authors = [{ name = "Jon-Mikkel Korsvik", email = "jkorsvik@outlook.com" }]
@@ -51,7 +51,12 @@ Homepage = "https://github.com/jkorsvik/dataflow-generator"
 Documentation = "https://github.com/jkorsvik/dataflow-generator/blob/main/README.md"
 
 [tool.setuptools]
-packages = ["src"]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["parsers*"]
+
 
 [tool.coverage.run]
 omit = []
