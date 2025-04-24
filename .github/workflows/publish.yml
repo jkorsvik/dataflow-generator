@@ -27,5 +27,8 @@ jobs:
       - name: Build package
         run: uv build
 
-      - name: Publish package distributions to PyPI
-        run: uv publish -t ${{ secrets.PYPI_API_TOKEN }}
+      #- name: Install Twine
+      #  run: uv pip install twine
+
+      - name: Publish package distributions to PyPI (twine)
+        run: uvx twine upload dist/* -u __token__ -p ${{ secrets.PYPI_API_TOKEN }}
