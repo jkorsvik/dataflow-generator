@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "data-flow-generator"
-version = "0.1.3"
+version = "0.1.4"
 description = "Interactive data flow visualization tool for database dumps"
 readme = "README.md"
 authors = [
