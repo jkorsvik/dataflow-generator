@@ -32,5 +32,4 @@ jobs:
       #  run: uv pip install twine
 
       - name: Publish package distributions to PyPI (twine)
-        if: github.ref == 'refs/heads/main'
         run: uvx twine upload dist/* -u __token__ -p ${{ secrets.PYPI_API_TOKEN }}
