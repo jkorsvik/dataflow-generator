@@ -12,6 +12,13 @@
 
 This tool generates visual representations of data flows based on Denodo metadata exported in a `.vql` file. It can produce both complete data flow diagrams and focused data flow diagrams for specified views and tables.
 
+## Changelog
+
+### 0.1.1 (2025-04-24)
+- Bumped project version to 0.1.1
+- Added keywords and long_description_content_type in pyproject.toml for PyPI
+- Switched CI publish step to use Twine upload
+
 ## Installation
 
 ### Dependencies
@@ -29,6 +36,18 @@ source setup.sh
 To reset the environment:
 ```sh
 rm -rf .venv && source setup.sh
+```
+
+## Installation
+
+- Install from PyPI:
+```sh
+pip install data-flow-generator
+```
+
+- Install for current user:
+```sh
+pip install --user data-flow-generator
 ```
 
 ## Usage

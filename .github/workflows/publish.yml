@@ -31,4 +31,4 @@ jobs:
       #  run: uv pip install twine
 
       - name: Publish package distributions to PyPI (twine)
-        run: uvx twine upload dist/* -u __token__ -p ${{ secrets.PYPI_API_TOKEN }}
+        run: uvx twine upload dist/* -u __token__ -p ${{ secrets.PYPI_API_TOKEN }} --verbose
