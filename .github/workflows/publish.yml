@@ -22,12 +22,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install build tool
-        run: uv pip install build --system
+        run: uv sync --dev
 
       - name: Build package
-        run: python -m build
+        run: uv build
 
       - name: Publish package distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
+        run: uv publish -t ${{ secrets.PYPI_API_TOKEN }}
