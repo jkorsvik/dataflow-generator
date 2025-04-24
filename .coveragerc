@@ -1,7 +1,6 @@
 [run]
 source = src
 branch = True
-omit = src/plotly_vis.py
 
 [report]
 exclude_lines =

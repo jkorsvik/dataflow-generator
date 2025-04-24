@@ -20,16 +20,39 @@ This tool generates visual representations of data flows based on Denodo metadat
 - Python 3.10 or higher
 - UV package manager
 
-### Setup (Works also for openvscodeserver)
+### Setup
 
-If you prefer not to use UV, you can still use the traditional setup:
+#### Linux/macOS
 ```sh
 source setup.sh
 ```
 
+#### Windows
+For PowerShell:
+```powershell
+.\setup.ps1
+```
+
+For Command Prompt:
+```cmd
+setup.bat
+```
+
 To reset the environment:
+
+Linux/macOS:
 ```sh
 rm -rf .venv && source setup.sh
+```
+
+Windows (PowerShell):
+```powershell
+Remove-Item -Recurse -Force .venv; .\setup.ps1
+```
+
+Windows (Command Prompt):
+```cmd
+rmdir /s /q .venv && setup.bat
 ```
 
 ## Installation
@@ -220,20 +243,16 @@ If the tool does not detect any database prefixes in your VQL file, it will:
    - Creates interactive Pyvis figures for the data flow diagrams.
    - Returns an interactive figure.
 
-5. **generate_plotly_png(edges, node_types, ...)**:
-   - Creates Plotly figures for the data flow diagrams with database information.
-   - Returns a static figure.
-
-6. **draw_complete_data_flow(edges, node_types, save_path=None, file_name=None)**:
+5. **draw_complete_data_flow(edges, node_types, save_path=None, file_name=None)**:
    - Generates and displays a complete data flow diagram.
    - Adjusts the figure size based on the number of nodes.
-   - Saves the figure as `complete_data_flow_plotly_metadata_file_name.png` and `complete_data_flow_pyvis_metadata_file_name.html`.
+   - Saves the figure as `complete_data_flow_pyvis_metadata_file_name.html`.
 
-7. **draw_focused_data_flow(edges, node_types, focus_nodes, save_path=None, file_name=None, see_ancestors=True, see_descendants=True)**:
+6. **draw_focused_data_flow(edges, node_types, focus_nodes, save_path=None, file_name=None, see_ancestors=True, see_descendants=True)**:
    - Generates and displays a focused data flow diagram for the specified nodes.
    - Includes the specified nodes, their ancestors, and descendants in the subgraph if enabled.
    - Adjusts the figure size based on the number of nodes.
-   - Saves the figure as `focused_data_flow_plotly_metadata_file_name.png` and `focused_data_flow_pyvis_metadata_file_name.html`.
+   - Saves the figure as `focused_data_flow_pyvis_metadata_file_name.html`.
 
 ### Main Script Execution
 
@@ -256,7 +275,6 @@ If the tool does not detect any database prefixes in your VQL file, it will:
     |   |-- __init__.py
     |   |-- dataflow.py         # Command line interface
     |   |-- generate_data_flow.py
-    |   |-- plotly_vis.py
     |   |-- pyvis_mod.py
     |-- tests/
     |   |-- generate_data_flow_test.py
@@ -265,8 +283,6 @@ If the tool does not detect any database prefixes in your VQL file, it will:
     |   |-- denodo_metadata1.vql
     |   |-- denodo_metadata2.vql
     |-- generated-image/       # Output directory
-        |-- complete_data_flow_*.png
-        |-- focused_data_flow_*.png
         |-- complete_data_flow_*.html
         |-- focused_data_flow_*.html
 ```

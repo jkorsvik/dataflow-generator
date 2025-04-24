@@ -6,42 +6,54 @@ from colorama import init, Fore, Style, Back
 from src.generate_data_flow import (
     draw_focused_data_flow,
     draw_complete_data_flow,
-    parse_vql,
+    parse_dump,
 )
 import glob
 import itertools
 import threading
-import sys
+import sys, webbrowser
 import time
-from pathlib import Path # Add Path import
+from pathlib import Path  # Add Path import
 from rapidfuzz import process
-from typing import List, Dict, Optional
-from src import path_utils # Import the new utility module
+from typing import List, Dict, Optional, Set
+from src import path_utils  # Import the new utility module
 
 # Constants
 SQL_EXTENSIONS = [
-    '.sql',     # Standard SQL files
-    '.vql',     # Denodo VQL files
-    '.ddl',     # Data Definition Language
-    '.dml',     # Data Manipulation Language
-    '.hql',     # Hive Query Language
-    '.pls',     # PL/SQL files
-    '.plsql',   # PL/SQL files
-    '.proc',    # Stored Procedures
-    '.psql',    # PostgreSQL files
-    '.tsql',    # T-SQL files
-    '.view'     # View definitions
+    ".sql",  # Standard SQL files
+    ".vql",  # Denodo VQL files
+    ".ddl",  # Data Definition Language
+    ".dml",  # Data Manipulation Language
+    ".hql",  # Hive Query Language
+    ".pls",  # PL/SQL files
+    ".plsql",  # PL/SQL files
+    ".proc",  # Stored Procedures
+    ".psql",  # PostgreSQL files
+    ".tsql",  # T-SQL files
+    ".view",  # View definitions
 ]
 
 # Initialize colorama and constants
 init()
 
+# Key bindings for back navigation
 # Key bindings
-BACK_KEY = 'b'
-BACK_TOOLTIP = f"(press '{BACK_KEY}' to go back)"
+BACK_KEY = "b"
+ESC_KEY = "\x1b"
+CTRL_C_KEY = "\x03"
+CTRL_D_KEY = "\x04"  # Add Ctrl+D as another way to cancel
+BACK_TOOLTIP = f"(press '{BACK_KEY}', ESC, or Ctrl+C to go back)"
+
 
 def handle_back_key(key: str) -> bool:
     """Check if back navigation is requested
+
+    Handles multiple ways to go back:
+    - 'b' key (case insensitive by default)
+    - ESC key
+    - Ctrl+C key
+    - Ctrl+D key
+    - KeyboardInterrupt exceptions
 
     Args:
         key (str): Key pressed by user
@@ -50,7 +62,12 @@ def handle_back_key(key: str) -> bool:
         bool: True if back navigation requested
     """
 
-    return key.lower() == BACK_KEY
+    # Check if key is the designated back key or special escape keys
+    # Always convert to lowercase for case-insensitive comparison
+    if isinstance(key, str):
+        key = key.lower() if len(key) == 1 else key
+    return key in [BACK_KEY, ESC_KEY, CTRL_C_KEY, CTRL_D_KEY]
+
 
 class Node:
     """
@@ -67,11 +84,13 @@ class Node:
         self.node_type = node_type
         self.enabled = enabled
 
+
 def clear_screen():
     """
     Clears the terminal screen.
     """
     os.system("cls" if os.name == "nt" else "clear")
+
 
 def is_sql_file(file_path: str) -> bool:
     """
@@ -83,36 +102,123 @@ def is_sql_file(file_path: str) -> bool:
     Returns:
         bool: True if file has a SQL extension
     """
-    return any(file_path.lower().endswith(ext) for ext in SQL_EXTENSIONS)
+    return any(str(file_path).lower().endswith(ext) for ext in SQL_EXTENSIONS)
 
-def handle_file_drop() -> Optional[str]:
+
+def normalize_file_path(raw_path: str) -> str:
     """
-    Handle file drag and drop in terminal
+    Normalize a file path for cross-platform compatibility.
+
+    Handles paths from drag-and-drop operations on different platforms.
+
+    Args:
+        raw_path (str): Raw file path string
+
+    Returns:
+        str: Normalized file path
+    """
+    # Strip quotes that might be added by drag-and-drop
+    path = raw_path.strip().strip("'\"")
+
+    # Convert potential URI format (common in drag-and-drop on some platforms)
+    if path.startswith(("file://", "file:///", "file:")):
+        # Remove the file:// or file:/// prefix
+        path = re.sub(r"^file:/{2,3}", "", path)
+
+        # On Windows, file:///C:/path becomes C:/path
+        # On Unix-like systems, file:///path becomes /path
+
+        # Handle URL encoding (%20 for spaces, etc.)
+        import urllib.parse
+
+        path = urllib.parse.unquote(path)
+
+    # Convert to proper path object and resolve to absolute path
+    path_obj = Path(path)
+    try:
+        return str(path_obj.resolve())
+    except (OSError, RuntimeError):
+        # If resolution fails, return the original
+        return path
+
+
+def normalize_path_for_platform(path_str: str) -> str:
+    """
+    Ensures a path is properly formatted for the current platform.
+
+    Args:
+        path_str (str): Path string that might need normalization
+
+    Returns:
+        str: Platform-appropriate path string
+    """
+    # First normalize using our standard function
+    norm_path = normalize_file_path(path_str)
+
+    # Handle Windows-specific path normalization
+    if os.name == "nt":
+        # Convert forward slashes to backslashes for Windows
+        norm_path = norm_path.replace("/", "\\")
+
+        # Handle escaped spaces in Windows paths
+        norm_path = norm_path.replace("\ ", " ")
+    else:
+        # For Unix-like systems, ensure proper escaping if needed
+        if (
+            " " in norm_path
+            and not norm_path.startswith('"')
+            and not norm_path.startswith("'")
+        ):
+            norm_path = f'"{norm_path}"'
+
+    return norm_path
+
+
+def handle_file_drop(allow_back: bool = True) -> Optional[str]:
+    """
+    Handle file drag and drop in terminal in an OS-agnostic way.
+    Supports file paths dragged into the terminal on Windows, macOS, and Linux.
 
     Returns:
         Optional[str]: Path to dropped file or None if cancelled
     """
     print(f"\n{Back.BLUE}{Fore.WHITE} Drop your SQL file here {Style.RESET_ALL}")
-    print("(or type 'cancel' to exit)")
-    
-    file_path = input().strip().strip("'\"")  # Remove quotes that might be added by drag-and-drop
-    
-    if file_path.lower() == 'cancel':
+    print(f"(or type 'cancel' {BACK_TOOLTIP})")
+
+    try:
+        raw_input = input().strip()
+
+        # Check for cancellation
+        if raw_input.lower() == "cancel" or raw_input.lower() == BACK_KEY:
+            return None
+
+        # First normalize using platform-specific logic
+        # Normalize the file path for cross-platform compatibility
+        file_path = normalize_path_for_platform(raw_input)
+
+    except KeyboardInterrupt:
+        print("\nOperation cancelled.")
         return None
-        
+
     if not os.path.isfile(file_path):
-        print(f"{Fore.RED}Error: Not a valid file path{Style.RESET_ALL}")
+        print(f"{Fore.RED}Error: Not a valid file path: {file_path}{Style.RESET_ALL}")
+        input("Press Enter to continue...")
         return None
-        
+
     if not is_sql_file(file_path):
         proceed = questionary.confirm(
             f"File {os.path.basename(file_path)} doesn't have a SQL extension. Continue anyway?",
-            default=False
+            default=False,
         ).ask()
+
+        # Handle None as back navigation
+        if proceed is None:
+            return None
         if not proceed:
             return None
-            
+
     return file_path
+
 
 def validate_sql_content(file_path: str) -> bool:
     """
@@ -125,28 +231,54 @@ def validate_sql_content(file_path: str) -> bool:
         bool: True if file appears to contain SQL content
     """
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             content = f.read(1000)  # Read first 1000 chars for quick check
             # Look for common SQL keywords
             sql_patterns = [
-                r'\b(CREATE|SELECT|FROM|JOIN|VIEW|TABLE)\b',
-                r'\b(INSERT|UPDATE|DELETE|DROP|ALTER)\b'
+                r"\b(CREATE|SELECT|FROM|JOIN|VIEW|TABLE)\b",
+                r"\b(INSERT|UPDATE|DELETE|DROP|ALTER)\b",
             ]
             return any(re.search(pattern, content, re.I) for pattern in sql_patterns)
     except Exception:
         return False
 
-def collect_sql_files() -> List[str]:
+
+def collect_sql_files(search_dirs: Optional[List[Path]] = None) -> List[str]:
     """
-    Collect all SQL files in current directory and subdirectories
+    Collect all SQL files recursively from specified base directories.
+
+    If no directories are provided, defaults to CWD, User Downloads,
+    User Documents, and the standard data directory.
+
+    Args:
+        search_dirs (Optional[List[Path]]): List of base directories to search.
 
     Returns:
-        List[str]: List of paths to SQL files
+        List[str]: Sorted list of absolute paths to unique SQL files found.
     """
-    files = []
-    for ext in SQL_EXTENSIONS:
-        files.extend(glob.glob(f"**/*{ext}", recursive=True))
-    return sorted(list(set(files)))  # Remove duplicates and sort
+    if search_dirs is None:
+        search_dirs = [
+            Path.cwd(),
+            Path.home() / "Downloads",
+            Path.home() / "Documents",
+            path_utils.DATA_FLOW_BASE_DIR,  # Add standard data dir
+        ]
+
+    found_files: Set[Path] = set()
+    for base_dir in search_dirs:
+        if not base_dir.is_dir():
+            continue  # Skip if dir doesn't exist
+        for ext in SQL_EXTENSIONS:
+            try:
+                # Use rglob for recursive search, converting to absolute paths
+                found_files.update(p.resolve() for p in base_dir.rglob(f"*{ext}"))
+            except (PermissionError, FileNotFoundError) as e:
+                print(
+                    f"{Fore.YELLOW}Warning: Could not search {base_dir}: {e}{Style.RESET_ALL}"
+                )
+
+    return sorted([str(f) for f in found_files])
+
 
 def add_back_to_choices(choices: List[str]) -> List[str]:
     """Add back option to choices list
@@ -159,6 +291,16 @@ def add_back_to_choices(choices: List[str]) -> List[str]:
     """
     return choices + ["← Go back"]
 
+
+def safe_input(prompt: str) -> Optional[str]:
+    """Safe input wrapper that handles keyboard interrupts"""
+    try:
+        return input(prompt)
+    except KeyboardInterrupt:
+        print("\nOperation cancelled.")
+        return None
+
+
 def select_metadata(allow_back: bool = False) -> Optional[str]:
     """
     Allows the user to select a metadata file using various methods.
@@ -168,68 +310,134 @@ def select_metadata(allow_back: bool = False) -> Optional[str]:
     """
     base_choices = [
         "Browse SQL Files",
-        "Drop/Upload File",    
+        "Browse Files in Standard Locations",  # Add this option
+        "Drop/Paste File Path",
         "Search in directory",
         "Specify file path",
     ]
     choices = add_back_to_choices(base_choices) if allow_back else base_choices
-    
+
     choice = questionary.select(
-        f"How would you like to select your file? {BACK_TOOLTIP if allow_back else ''}",
-        choices=choices
+        f"How would you like to select a SQL file? {BACK_TOOLTIP if allow_back else ''}",
+        choices=choices,
+        mouse_support=True,
+        use_shortcuts=True,
     ).ask()
 
-    if not choice or choice == "← Go back":
+    # Handle None as back navigation or explicit back choice
+    if choice is None or choice == "← Go back":
         return None
-    
+
     if not choice:
         return None
 
-    if choice == "Drop/Upload File":
-        return handle_file_drop()
-        
+    if choice == "Drop/Paste File Path":
+        return handle_file_drop(allow_back=allow_back)
+
     elif choice == "Browse SQL Files":
+        # Browse only in current directory
+        files = collect_sql_files([Path.cwd()])
+
+        # Handle no files found in CWD
+        if not files:
+            proceed = questionary.confirm(
+                "No SQL files found in current directory. Would you like to search in standard locations?",
+                default=True,
+            ).ask()
+
+            # Handle back navigation
+            if proceed is None:
+                return None
+
+            # Search in standard locations if requested
+            if proceed:
+                return select_metadata(allow_back=True)
+            else:
+                # User doesn't want to search elsewhere
+                return None
+
+        file_choices = files + ["← Browse in more locations"]
+        file_choice = questionary.select(
+            "Select a file from current directory:", choices=file_choices
+        ).ask()
+
+        # Handle selection
+        if file_choice is None:
+            return None
+        elif file_choice == "← Browse in more locations":
+            # Fall through to broader search
+            return select_metadata(allow_back=True)
+        else:
+            file_path = file_choice
+
+    elif choice == "Browse Files in Standard Locations":
+        # Use expanded search with standard locations
         files = collect_sql_files()
         if not files:
-            print(f"{Fore.YELLOW}No SQL files found in current directory{Style.RESET_ALL}")
+            print(
+                f"{Fore.YELLOW}No SQL files found in standard locations.{Style.RESET_ALL}"
+            )
             return None
+
         file_path = questionary.select(
-            "Select a file:",
-            choices=files
+            "Select a file from standard locations:", choices=files
         ).ask()
-    
+
     elif choice == "Specify file path":
         file_path = questionary.path(
-            "Enter the path to your file:",
-            validate=lambda path: os.path.exists(path) and os.path.isfile(path)
-        ).ask()
-    
-    else:  # Search in directory
-        files = collect_sql_files()
-        if not files:
-            print(f"{Fore.YELLOW}No SQL files found in current directory{Style.RESET_ALL}")
-            return None
-        file_path = questionary.autocomplete(
-            "Search for file:",
-            choices=files
+            "Enter the absolute path to your file:",  # Clarify prompt
         ).ask()
 
-    if not file_path:
+    else:  # Search in directory
+        files = collect_sql_files()  # Use all standard locations
+        if not files:
+            print(
+                f"{Fore.YELLOW}No SQL files found in default search locations.{Style.RESET_ALL}"
+            )
+            return None
+        file_path = questionary.autocomplete("Search for file:", choices=files).ask()
+
+    # Handle None (back navigation)
+    if file_path is None:
         return None
 
-    # Validate selected file
+    # Convert to absolute path if needed
+    try:
+        path_obj = Path(file_path)
+        if not path_obj.is_absolute():
+            file_path = str(path_obj.resolve())
+    except (OSError, RuntimeError) as e:
+        print(f"{Fore.RED}Error normalizing path: {e}{Style.RESET_ALL}")
+
+    # Check if the file exists
+    if file_path and not os.path.exists(file_path):
+        # Special case for Windows - try alternate slashes
+        if os.name == "nt" and "/" in file_path:
+            alt_path = file_path.replace("/", "\\")
+            if os.path.exists(alt_path):
+                file_path = alt_path
+
+    # Validate file exists and appears to be SQL
     # Only validate content if it's not a recognized SQL file
     if not is_sql_file(file_path) and not validate_sql_content(file_path):
         proceed = questionary.confirm(
             "This file doesn't appear to contain SQL content. Continue anyway?",
-            default=False
+            default=False,
         ).ask()
         if not proceed:
-            return select_metadata()  # Recursively try again
+            return select_metadata(allow_back=allow_back)  # Recursively try again
+
+    # Final check after all processing
+    if not os.path.exists(file_path):
+        if isinstance(file_path, str):
+            file_path = str(os.path.abspath(file_path))
     if isinstance(file_path, str):
         return str(os.path.abspath(file_path))
     else:
-        raise ValueError("Invalid Processing of pathlike str object in function dataflow.select_metadata.")
+        raise ValueError(
+            "Invalid Processing of pathlike str object in function dataflow.select_metadata."
+        )
+
 
 def toggle_nodes(node_types: Dict[str, Dict[str, str]]) -> List[str]:
     """
@@ -286,7 +494,7 @@ def toggle_nodes(node_types: Dict[str, Dict[str, str]]) -> List[str]:
                 print(f"  {full_info}: {status}")
 
         key = readchar.readkey()
-    
+
         if handle_back_key(key):
             return []  # Return empty list to indicate back navigation
         elif key == readchar.key.UP and current_index > 0:
@@ -306,12 +514,22 @@ def toggle_nodes(node_types: Dict[str, Dict[str, str]]) -> List[str]:
                     print(f"{Fore.GREEN}{enabled_node}{Style.RESET_ALL}")
             else:
                 print(f"{Fore.RED}None{Style.RESET_ALL}")
-            input("Press Enter to return...")  # Pause to show the message
+
+            # Use safe_input to handle Ctrl+C
+            result = safe_input("Press Enter to return or 'b' to go back...")
+
+            # Also check if user pressed 'b' to go back completely
+            if result is None or result.lower() == "b":
+                return []
         elif key == "s":
+            # Enter search mode
+            result = search_node(nodes)
+            if result is None:
+                return []  # Back navigation from search - exit toggle_nodes
             clear_screen()
-            search_node(nodes)
 
     return [node.name for node in nodes if node.enabled]
+
 
 def search_node(nodes: List[Node]):
     """
@@ -331,9 +549,7 @@ def search_node(nodes: List[Node]):
 
     while True:
         clear_screen()
-        print(
-            instructions
-        )
+        print(instructions)
         print(f"Current search: {search_query}")
 
         matches = (
@@ -380,7 +596,6 @@ def search_node(nodes: List[Node]):
 
         print(key)
         if handle_back_key(key):
-        
             return None  # Return None to indicate back navigation
         elif key == readchar.key.TAB:
             print("TAB pressed. Exiting loop.")
@@ -401,7 +616,10 @@ def search_node(nodes: List[Node]):
             search_query += key
             current_index = 0
 
-def get_user_choice(prompt: str, options: List[str], default: int = 0, allow_back: bool = True) -> Optional[int]:
+
+def get_user_choice(
+    prompt: str, options: List[str], default: int = 0, allow_back: bool = True
+) -> Optional[int]:
     """
     Prompts the user to select an option using questionary.
 
@@ -418,15 +636,14 @@ def get_user_choice(prompt: str, options: List[str], default: int = 0, allow_bac
         options = add_back_to_choices(options)
 
     answer = questionary.select(
-        prompt,
-        choices=options,
-        default=options[default-1] if default > 0 else None
+        prompt, choices=options, default=options[default - 1] if default > 0 else None
     ).ask()
 
     if not answer or answer == "← Go back":
         return None
-    
+
     return options.index(answer) + 1 if answer != "← Go back" else None
+
 
 def select_focus_span() -> Optional[Dict[str, bool]]:
     """
@@ -439,21 +656,21 @@ def select_focus_span() -> Optional[Dict[str, bool]]:
 
     ancestors_choice = questionary.confirm(
         "Include ancestors of focused nodes?",
-        default=True
+        default=True,
     ).ask()
-    
+
     if ancestors_choice is None:  # User pressed 'b'
         return None
 
     descendants_choice = questionary.confirm(
-        "Include descendants of focused nodes?",
-        default=True
+        "Include descendants of focused nodes?", default=True
     ).ask()
 
     if descendants_choice is None:  # User pressed 'b'
         return None
 
     return {"Ancestors": ancestors_choice, "Descendants": descendants_choice}
+
 
 def loading_animation():
     """
@@ -465,14 +682,21 @@ def loading_animation():
         sys.stdout.flush()
         time.sleep(0.1)
 
+
 def run_with_loading(func, *args, **kwargs):
     """
-    Runs a function with a loading animation.
+    Runs a function with a loading animation spinner.
+
+    This creates a background thread that displays a spinner animation
+    while the main function executes, providing visual feedback
+    that the application is working.
 
     Parameters:
-    func (callable): The function to run.
-    *args: Positional arguments for the function.
-    **kwargs: Keyword arguments for the function.
+    ----------
+    func : callable
+        The function to run with the loading animation.
+    *args: Variable length argument list to pass to the function.
+    **kwargs: Arbitrary keyword arguments to pass to the function.
 
     Returns:
     The result of the function call.
@@ -487,27 +711,41 @@ def run_with_loading(func, *args, **kwargs):
     loading_thread.join()
     return result
 
+
 def main():
     """
     Main function to run the Flow Diagram Creator CLI.
     """
+    # Print welcome message
+    clear_screen()
+    print(f"{Fore.GREEN}Welcome to the Data Flow Diagram Generator{Style.RESET_ALL}")
+    print("This tool helps you visualize SQL data dependencies")
+    print(
+        f"Press {Fore.CYAN}{BACK_KEY}{Style.RESET_ALL}, {Fore.CYAN}ESC{Style.RESET_ALL}, or {Fore.CYAN}Ctrl+C{Style.RESET_ALL} at any time to go back or exit\n"
+    )
+    input("Press Enter to continue...")
+
     while True:  # Main application loop
         clear_screen()
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        
+
         # File selection loop
         metadata_file = select_metadata(allow_back=True)
         if not metadata_file:
             print("No file selected. Exiting.")
             return
 
-        print(f"{Fore.BLUE}Parsing{Style.RESET_ALL} {os.path.relpath(metadata_file, script_dir)}...")
-        edges, node_types, database_stats = run_with_loading(parse_vql, metadata_file)
+        print(
+            f"{Fore.BLUE}Parsing{Style.RESET_ALL} {os.path.relpath(metadata_file, script_dir)}..."
+        )
+        edges, node_types, database_stats = run_with_loading(parse_dump, metadata_file)
 
         clear_screen()
         # Database selection loop
         while database_stats:
-            sorted_dbs = sorted(database_stats.items(), key=lambda x: x[1], reverse=True)
+            sorted_dbs = sorted(
+                database_stats.items(), key=lambda x: x[1], reverse=True
+            )
             print("\nDetected database usage frequencies:")
             for db, count in sorted_dbs:
                 print(f"{db}: {count} occurrences")
@@ -516,14 +754,15 @@ def main():
             db_options.append("None of the above")
             db_choice = get_user_choice(
                 "Select the main database:",
-                [f"{db} ({count} occurrences)" for db, count in sorted_dbs] + ["None of the above"]
+                [f"{db} ({count} occurrences)" for db, count in sorted_dbs]
+                + ["None of the above"],
             )
             clear_screen()
             if db_choice is None:  # User pressed 'b'
                 break  # Go back to file selection
-                
+
             main_db = db_options[db_choice - 1]
-            
+
             # Process database selection
             for node_key, node_info in node_types.items():
                 db = node_info["database"]
@@ -531,10 +770,26 @@ def main():
                     continue  # Skip CTE views
                 elif db == "data_market":
                     node_info["type"] = "datamarket"
-                elif db and db != "" and db != main_db and main_db != "None of the above":
+                elif (
+                    db and db != "" and db != main_db and main_db != "None of the above"
+                ):
                     node_info["type"] = "other"
                 elif not db or db == "" or node_info["type"] == "other":
-                    node_info["type"] = "view" if node_key.startswith(("v_", "iv_", "rv_", "bv_", "wv_")) else "table"
+                    # Determine node type based on naming convention
+                    is_view = node_key.startswith(("v_", "iv_", "rv_", "bv_", "wv_"))
+                    node_info["type"] = "view" if is_view else "table"
+
+            # Handle the case where user pressed the back key or ESC during database selection
+            if db_choice is None:
+                clear_screen()
+                proceed = questionary.confirm(
+                    "Do you want to select a different file?",
+                    default=True,
+                ).ask()
+                if proceed:
+                    break  # Go back to file selection
+                else:
+                    return  # Exit program
             break  # Continue to diagram selection
 
         if not node_types:
@@ -550,9 +805,9 @@ def main():
             diagram_type = get_user_choice(
                 "What type of diagram would you like to create?",
                 ["Complete flow diagram", "Focused flow diagram"],
-                default=1
+                default=1,
             )
-            
+
             if diagram_type is None:  # User pressed 'b'
                 if database_stats:
                     break  # Go back to database selection
@@ -565,33 +820,65 @@ def main():
                     "Would you like to draw the nodes that dont have any dependencies?",
                     ["Draw", "Don't draw"],
                     default=1,
-                    allow_back=True
+                    allow_back=True,
                 )
-                
+
+                # Add option to auto-open in browser
+                auto_open = get_user_choice(
+                    "Automatically open the diagram in your browser?",
+                    ["Yes", "No"],
+                    default=1,
+                    allow_back=True,
+                )
+
                 if draw_edgeless is None:  # User pressed 'b'
                     continue  # Go back to diagram type selection
 
+                # Both auto_open and draw_edgeless are None if user went back
+                if auto_open is None:  # User pressed 'b'
+                    continue  # Go back to diagram type selection
+
+                # Convert choices to boolean values
+                draw_edgeless = draw_edgeless == 1
+                auto_open = auto_open == 1
+
                 clear_screen()
-                print(f"{Fore.BLUE}Creating{Style.RESET_ALL} a complete flow diagram...")
+                print(
+                    f"{Fore.BLUE}Creating{Style.RESET_ALL} a complete flow diagram..."
+                )
                 run_with_loading(
                     draw_complete_data_flow,
                     edges,
                     node_types,
-                    str(output_folder), # Pass path as string
-                    Path(metadata_file).stem, # Use Pathlib for consistency
-                    draw_edgeless=(True if draw_edgeless == 1 else False),
+                    str(output_folder),  # Pass path as string
+                    Path(metadata_file).stem,  # Use Pathlib for consistency
+                    draw_edgeless=draw_edgeless,
+                    auto_open=auto_open,  # Convert to boolean
                 )
             else:
                 updated_nodes = toggle_nodes(node_types)
                 if not updated_nodes:  # User might have pressed 'b'
                     continue  # Go back to diagram type selection
-                    
+
                 choices = select_focus_span()
                 if choices is None:  # User pressed 'b'
                     continue  # Go back to diagram type selection
 
+                # Add option to auto-open in browser for focused view too
+                auto_open = get_user_choice(
+                    "Automatically open the diagram in your browser?",
+                    ["Yes", "No"],
+                    default=1,
+                    allow_back=True,
+                )
+
+                if auto_open is None:  # User pressed 'b'
+                    continue  # Go back to diagram type selection
+
                 clear_screen()
-                print(f"{Fore.BLUE}Creating{Style.RESET_ALL} a focused flow diagram with the following nodes:")
+                print(
+                    f"{Fore.BLUE}Creating{Style.RESET_ALL} a focused flow diagram with the following nodes:"
+                )
                 for node in updated_nodes:
                     print(f"- {node}")
                 run_with_loading(
@@ -599,21 +886,48 @@ def main():
                     edges,
                     node_types,
                     focus_nodes=updated_nodes,
-                    save_path=str(output_folder), # Pass path as string
-                    file_name=Path(metadata_file).stem, # Use Pathlib for consistency
+                    save_path=str(output_folder),  # Pass path as string
+                    file_name=Path(metadata_file).stem,  # Use Pathlib for consistency
                     see_ancestors=choices.get("Ancestors"),
                     see_descendants=choices.get("Descendants"),
+                    auto_open=auto_open,  # Convert to boolean
                 )
 
             print(f"Flow diagram created {Fore.GREEN}successfully!{Style.RESET_ALL}")
             # Use the absolute path from path_utils
-            print(f"The generated flow diagram can be found in the folder: {output_folder}")
+            print(
+                f"The generated flow diagram can be found in the folder: {output_folder}"
+            )
             print(f"Standard data directory: {path_utils.DATA_FLOW_BASE_DIR}")
-            if input("Press 'c' to continue with other, all other presses exits program...") != "c":
-                # Exit program
-                sys.exit()
+
+            # Ask if user wants to continue or exit
+            result = safe_input(
+                f"Press 'c' to continue with another diagram, {BACK_TOOLTIP}, all other keys to exit..."
+            )
+
+            # Handle the response
+            if result is None or result.lower() not in ["c", "continue"]:
+                # Use safe_input to handle KeyboardInterrupt
+                try:
+                    # Ask one more time if the user wants to exit
+                    exit_choice = questionary.confirm(
+                        "Would you like to create another diagram?",
+                        # Default to No on exit confirmation
+                        default=False,
+                    ).ask()
+
+                    # If None (back navigation) or False (no), exit
+                    if exit_choice is None:
+                        sys.exit()  # Exit on back navigation
+                    elif exit_choice:
+                        # User confirmed they want another diagram
+                        break  # Return to main menu
+                except KeyboardInterrupt:
+                    sys.exit()  # Exit on KeyboardInterrupt
+                except Exception as e:
+                    print(f"{Fore.RED}Unexpected error: {e}{Style.RESET_ALL}")
             break  # Return to main menu
-        
+
 
 if __name__ == "__main__":
     main()

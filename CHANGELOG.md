@@ -1,5 +1,12 @@
 ## Changelog
 
+### 0.1.5 (2025-04-25)
+- Added browser auto-open feature for generated diagrams
+- Made browser auto-open configurable via both CLI and command-line interface
+- Added `--auto-open` and `--no-auto-open` flags to command-line interface
+- Improved cross-platform compatibility for file path handling
+- Enhanced back navigation with ESC and Ctrl+C support
+
 ### 0.1.4 (2025-04-24)
 - Added command and path handling for files.
 
