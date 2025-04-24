@@ -1,0 +1,116 @@
+CREATE OR REPLACE VIEW v_address_register_all FOLDER = '/01_base_layer/internal/address' AS
+WITH union_registers AS (
+SELECT ,
+'kartverket' AS source_register
+FROM i_bv_address_register_kartverket
+UNION
+SELECT cast(regexp(trim(adressenummer), '[^0-9]', '') AS BIGINT) AS adresseid,
+gatenavn AS adressetekst,
+cast(kommunekode AS TEXT) AS kommunenummer,
+kommunenavn AS kommunenavn,
+NULL AS adressetilleggsnavn,
+NULL AS adressetype,
+gatenavn AS adressenavn,
+cast(husnummer AS INTEGER) AS nummer,
+bokstav AS bokstav,
+NULL AS gardsnummer,
+NULL AS bruksnummer,
+cast(postnummer AS INTEGER) AS postnummer,
+poststed AS poststed,
+NULL AS tettstednummer,
+NULL AS tettstednavn,
+NULL AS nord,
+NULL AS oest,
+NULL AS oppdateringsdato,
+'2021-12-15' AS datauttaksdato,
+NULL AS lat,
+NULL AS long,
+'posten' AS source_register
+FROM i_bv_address_register_no
+)
+SELECT *
+FROM union_registers
+WHERE union_registers.datauttaksdato = (
+SELECT datauttaksdato
+FROM (
+SELECT subquery.,
+row_number() OVER(
+ORDER BY abs(
+getdaysbetween(
+to_date('yyyy-MM-dd', datauttaksdato),
+to_date('yyyyMM', year_month)
+)
+) ASC
+) AS rank
+FROM (SELECT DISTINCT datauttaksdato FROM union_registers) AS subquery
+)
+WHERE rank = 1
+) USING PARAMETERS(year_month : text) CONTEXT ('formatted' = 'yes');
+CREATE OR REPLACE INTERFACE VIEW i_bv_address_register_kartverket (
+adresseid:long (sourcetyperadix = '10', sourcetypesize = '19', sourcetypeid = '-5'),
+adressetekst:text (sourcetypesize = '255', sourcetypeid = '12'),
+kommunenummer:text (sourcetypesize = '255', sourcetypeid = '12'),
+kommunenavn:text (sourcetypesize = '255', sourcetypeid = '12'),
+adressetilleggsnavn:text (sourcetypesize = '255', sourcetypeid = '12'),
+adressetype:text (sourcetypesize = '255', sourcetypeid = '12'),
+adressenavn:text (sourcetypesize = '255', sourcetypeid = '12'),
+nummer:int (sourcetyperadix = '10', sourcetypesize = '10', sourcetypeid = '4'),
+bokstav:text (sourcetypesize = '255', sourcetypeid = '12'),
+gardsnummer:long (sourcetyperadix = '10', sourcetypesize = '19', sourcetypeid = '-5'),
+bruksnummer:long (sourcetyperadix = '10', sourcetyperadix = '19', sourcetypeid = '-5'),
+postnummer:long (sourcetyperadix = '10', sourcetypesize = '19', sourcetypeid = '-5'),
+poststed:text (sourcetypesize = '255', sourcetypeid = '12'),
+tettstednummer:int (sourcetyperadix = '10', sourcetypesize = '10', sourcetypeid = '4'),
+tettstednavn:text (sourcetypesize = '255', sourcetypeid = '12'),
+nord:double (sourcetyperadix = '2', sourcetypesize = '53', sourcetypeid = '8'),
+øst:double (sourcetyperadix = '2', sourcetypesize = '53', sourcetypeid = '8'),
+oppdateringsdato:text (sourcetypesize = '255', sourcetypeid = '12'),
+datauttaksdato:text (sourcetypesize = '255', sourcetypeid = '12'),
+lat:double (sourcetyperadix = '2', sourcetypesize='53', sourcetypeid='8'),
+long:double (sourcetyperadix='2', sourcetypesize='53', sourcetypeid='8')
+)
+SET IMPLEMENTATION bv_initiative_s3_infa_insight_factory_exploredb_address_register_kartverket
+FOLDER='/01_base_layer/internal/address'
+DESCRIPTION='Address data from Kartverket. Replacing Posten address register from 2024. source>>i_bv_address_register_no<<source';
+CREATE OR REPLACE INTERFACE VIEW i_bv_address_register_no (
+adressenummer:text (sourcetypesize='255', sourcetypeid='12'),
+gatekode:long (sourcetyperadix='10', sourcetypesize='19', sourcetypeid='-5'),
+gatenavn:text (sourcetypesize='255', sourcetypeid='12'),
+husnummer:long (sourcetyperadix='10', sourcetypesize='19', sourcetypeid='-5'),
+bokstav:text (sourcetypesize='255', sourcetypeid='12'),
+seksjon:double (sourcetyperadix='2', sourcetypesize='53', sourcetypeid='8'),
+postnummer:long (sourcetyperadix='10', sourcetypesize='19', sourcetypeid='-5'),
+poststed:text (sourcetypesize='255', sourcetypeid='12'),
+kommunekode:long (sourcetyperadix='10', sourcetypesize='19', sourctypeid='-5'),
+kommunenavn:text (sourctypesize='255', sourctypeid='12')
+)
+SET IMPLEMENTATION bv_initiative_s3_infa_insight_factory_exploredb_adresseregister
+FOLDER='/01_base_layer/internal/address'
+DESCRIPTION='Norwegian address register from Posten Norge as of April-2021.';
+CREATE OR REPLACE WRAPPER JDBC bv_initiative_s3_infa_insight_factory_exploredb_202103_ecommerce_mapping_visa_no_parquet
+FOLDER='/01_base_layer/internal_cloud_aws/initiative_s3_infa_insight_factory_exploredb/initiative_s3_infa_insight_factory_exploredb'
+DATASOURCENAME=exploredb_athena_data_source_infa_insight_factory
+CATALOGNAME='AwsDataCatalog' ESCAPE
+SCHEMANAME='initiative_s3_infa_insight_factory_exploredb'
+RELATIONNAME='202103_ecommerce_mapping_visa_no_parquet' ESCAPE
+OUTPUTSCHEMA (
+year_month ='year_month':'java.lang.String'(OPT)(sourctypesize='255', sourctypeid='12', sourctypeid='12', sourctypename='string') SORTABLE,
+merchant_id_original ='merchant_id_original':'java.lang.String'(OPT)(sourctypesize='255', sourctypeid='12', sourctypename='string') SORTABLE,
+merchant_id_cleaned ='merchant_id_cleaned':'java.lang.Integer'(OPT)(sourctyperadix='10', sourctypesize='10', sourctypeid='4', sourctypename='integer') SORTABLE,
+merchant_name_original ='merchant_name_original':'java.lang.String'(OPT)(sourctypesize='255', sourctypeid='12', sourctypename='string') SORTABLE,
+merchant_name_cleaned ='merchant_name_cleaned':'java.lang.String'(OPT)(sourctypesize='255', sourctypeid='12', sourctypename='string') SORTABLE,
+transactiontextline_original ='transactiontextline_original':'java.lang.String'(OPT)(sourctypesize='255', sourctypeid='12', sourctypename='string') SORTABLE,
+transactiontextline ='transactiontextline':'java.lang.String'(OPT)(sourctypesize='255', sourctypeid='12', sourctypename='string') SORTABLE,
+address ='address':'java.lang.Integer'(OPT)(sourctyperadix='10', sourctypesize='10', sourctypeid='4', sourctypename='integer') SORTABLE,
+postal_cd ='postal_cd':'java.lang.String'(OPT)(sourctypesize='255', sourctypeid='12', sourctypename='string') SORTABLE,
+postal_name ='postal_name':'java.lang.String'(OPT)(sourctypesize='255', sourctypeid='12', sourctypename='string') SORTABLE,
+merchant_service ='merchant_service':'java.lang.String'(OPT)(sourctypesize='255', sourctypeid='12', sourctypename='string') SORTABLE,
+merchant_city ='merchant_city':'java.lang.String'(OPT)(sourctypesize='255', sourctypeid='12', sourctypename='string') SORTABLE,
+terminal_id ='terminal_id':'java.lang.String'(OPT)(sourctypesize='255', sourctypeid='12', sourctypename='string')
+)
+SET IMPLEMENTATION bv_initiative_s3_infa_insight_factory_exploredb_202103_ecommerce_mapping_visa_no_parquet
+FOLDER='/01_base_layer/internal_cloud_aws/initiative_s3_infa_insight_factory_exploredb/initiative_s3_infa_insight_factory_exploredb'
+DATASOURCENAME=exploredb_athena_data_source_infa_insight_factory
+CATALOGNAME='AwsDataCatalog' ESCAPE
+SCHEMANAME='initiative_s3_infa_insight_factory_exploredb'
+RELATIONNAME='202103_ecommerce_mapping_visa_no_parquet' ESCAPE
