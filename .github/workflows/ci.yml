@@ -2,9 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
   pull_request:
-    branches: [main]
 
 jobs:
   lint:
@@ -37,6 +35,7 @@ jobs:
             .coverage
 
   coverage:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     container: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
     needs: test
