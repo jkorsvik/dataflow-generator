@@ -1,7 +1,25 @@
 import unittest
 from unittest.mock import patch, mock_open
-from src.generate_data_flow import parse_vql, InvalidSQLError
+from src.generate_data_flow import parse_dump
+from src.parsers.parser_denodo import parse_dump as parse_denodo
+from src.exceptions import InvalidSQLError
+from typing import Tuple, List, Dict, Any
 
+
+def mock_parse_sql(
+    sql_text: str,
+) -> Tuple[List[Tuple[str, str]], Dict[str, Any], Dict[str, int]]:
+    """
+    Parse SQL directly from a string instead of a file.
+    This is used in tests to avoid having to create temporary files.
+
+    Args:
+        sql_text (str): SQL text to parse
+
+    Returns:
+        Tuple containing edges, node_types, and database_stats
+    """
+    return parse_denodo(sql_text)
 
 
 class TestDatabaseFunctions(unittest.TestCase):
@@ -20,11 +38,15 @@ class TestDatabaseFunctions(unittest.TestCase):
 
     @patch("builtins.open", new_callable=mock_open)
     def test_parse_vql_database_detection(self, mock_file):
-        mock_file.return_value.__enter__.return_value.read.return_value = self.sample_vql
-        edges, node_types, database_stats = parse_vql("dummy.vql")
+        mock_file.return_value.__enter__.return_value.read.return_value = (
+            self.sample_vql
+        )
+        edges, node_types, database_stats = mock_parse_sql(self.sample_vql)
 
         # Check database statistics
-        self.assertEqual(database_stats["db1"], 3)  # test_view, test_table2, test_table5
+        self.assertEqual(
+            database_stats["db1"], 3
+        )  # test_view, test_table2, test_table5
         self.assertEqual(database_stats["db2"], 2)  # test_table1, test_table4
         self.assertEqual(database_stats["db3"], 1)  # test_table3
 
@@ -40,7 +62,7 @@ class TestDatabaseFunctions(unittest.TestCase):
         SELECT * FROM test_table;
         """
         mock_file.return_value.__enter__.return_value.read.return_value = vql_content
-        edges, node_types, database_stats = parse_vql("dummy.vql")
+        edges, node_types, database_stats = mock_parse_sql(vql_content)
 
         # Should have empty database fields when no prefixes present
         self.assertEqual(node_types["test_view"]["database"], "")
@@ -62,7 +84,7 @@ class TestDatabaseFunctions(unittest.TestCase):
         SELECT * FROM cte1 JOIN cte2 ON cte1.id = cte2.id;
         """
         mock_file.return_value.__enter__.return_value.read.return_value = vql_content
-        edges, node_types, database_stats = parse_vql("dummy.vql")
+        edges, node_types, database_stats = mock_parse_sql(vql_content)
 
         # Check database statistics (should be unchanged)
         self.assertEqual(database_stats["db1"], 2)
@@ -82,7 +104,9 @@ class TestDatabaseFunctions(unittest.TestCase):
         self.assertIn(("table1", "cte1"), edges)
         self.assertIn(("table2", "cte1"), edges)
         self.assertIn(("table3", "cte2"), edges)
-        self.assertIn(("table4", "cte2"), edges) # Dependency from EXISTS subquery inside CTE
+        self.assertIn(
+            ("table4", "cte2"), edges
+        )  # Dependency from EXISTS subquery inside CTE
         self.assertIn(("cte1", "complex_view"), edges)
         self.assertIn(("cte2", "complex_view"), edges)
 
@@ -98,10 +122,9 @@ class TestDatabaseFunctions(unittest.TestCase):
 
     @patch("builtins.open", new_callable=mock_open)
     def test_parse_vql_empty_file(self, mock_file):
-        mock_file.return_value.__enter__.return_value.read.return_value = ""
+        empty_sql = ""
         with self.assertRaises(InvalidSQLError):
-            parse_vql("dummy.vql")
-
+            mock_parse_sql(empty_sql)
 
     @patch("builtins.open", new_callable=mock_open)
     def test_parse_vql_table_declaration_and_dependencies(self, mock_file):
@@ -173,7 +196,7 @@ class TestDatabaseFunctions(unittest.TestCase):
         FROM iv_site_org_visa_no;
         """
         mock_file.return_value.__enter__.return_value.read.return_value = vql_content
-        edges, node_types, database_stats = parse_vql("dummy.vql")
+        edges, node_types, database_stats = mock_parse_sql(vql_content)
         with open("res.txt", "w") as f:
             print(edges, node_types, file=f)
 
@@ -198,6 +221,6 @@ class TestDatabaseFunctions(unittest.TestCase):
         self.assertIn(("v_organizations", "iv_site_org_bax_pm"), edges)
         self.assertIn(("v_suborganizations", "iv_site_org_bax_pm"), edges)
 
+
 if __name__ == "__main__":
     unittest.main()
-

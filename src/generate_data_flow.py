@@ -2,7 +2,7 @@ import json
 import os
 import re
 import networkx as nx
-from typing import List, Tuple, Dict, TypedDict, Union, Set, Any, Optional  # noqa: F401
+from typing import List, Tuple, Dict, TypedDict, Union, Set, Any, Optional, cast  # noqa: F401
 
 from src import pyvis_mod
 from src.dataflow_structs import NodeInfo
@@ -21,11 +21,14 @@ def parse_dump(
     if database_type not in _PARSER_REGISTRY:
         raise ValueError(f"Unsupported or unrecognized database type: {database_type}")
     parser = _PARSER_REGISTRY[database_type]
-    return parser.parse_dump(file_path)
+    result = parser.parse_dump(file_path)
+    if not (isinstance(result, tuple) and len(result) == 3):
+        raise TypeError("Parser returned an invalid result. Expected a tuple of (edges, node_types, node_counts).")
+    return cast(Tuple[List[Tuple[str, str]], Dict[str, NodeInfo], Dict[str, int]], result)
 
 
 def draw_complete_data_flow(
-    edges, node_types, save_path="", file_name="", draw_edgeless=False, auto_open=True
+    edges, node_types, save_path="", file_name="", draw_edgeless=False, auto_open=False
 ) -> None:
     print(f"Generating complete data flow{' for ' + file_name if file_name else ''}...")
     pyvis_mod.draw_pyvis_html(
@@ -44,7 +47,7 @@ def draw_focused_data_flow(
     focus_nodes,
     save_path="",
     file_name="",
-    auto_open=True,
+    auto_open=False,
     see_ancestors=True,
     see_descendants=True,
 ):
