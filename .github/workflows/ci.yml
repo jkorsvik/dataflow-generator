@@ -70,6 +70,7 @@ jobs:
           name: coverage-artifacts
       - name: Generate coverage badge
         run: |
+          uv run coverage combine
           uv run coverage-badge -o coverage.svg
           COVERAGE=$(uv run coverage report | grep TOTAL | awk '{print $4}' | sed 's/%//')
           if [ "$COVERAGE" -lt 40 ]; then
@@ -84,26 +85,11 @@ jobs:
           path: |
             coverage.svg
             tests.svg
-      - name: Verify badge artifacts
-        run: |
-          if [ ! -f coverage.svg ] || [ ! -f tests.svg ]; then
-            echo "Required badge artifacts are missing."
-            exit 1
-          fi
-          echo "Badge artifacts found."
-  publish:
-    if: github.event_name == 'release' && github.event.action == 'published'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Cache uv dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('**/uv.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-uv-
+
       - name: Trigger publish workflow
         if: github.ref == 'refs/heads/main'
-        uses: ./.github/workflows/publish.yml
+        uses: peter-evans/workflow-dispatch@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          workflow: publish.yml
