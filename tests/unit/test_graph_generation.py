@@ -1,6 +1,27 @@
 import unittest
 from unittest.mock import patch, mock_open
-from src.generate_data_flow import parse_vql, InvalidSQLError
+from src.generate_data_flow import parse_dump
+from src.parsers.parser_denodo import parse_dump as parse_denodo
+from src.parser_register import DatabaseType
+from typing import Tuple, List, Dict, Any
+from src.exceptions import InvalidSQLError
+
+
+def mock_parse_sql(
+    sql_text: str,
+) -> Tuple[List[Tuple[str, str]], Dict[str, Any], Dict[str, int]]:
+    """
+    Parse SQL directly from a string instead of a file.
+    This is used in tests to avoid having to create temporary files.
+
+    Args:
+        sql_text (str): SQL text to parse
+
+    Returns:
+        Tuple containing edges, node_types, and database_stats
+    """
+    return parse_denodo(sql_text)
+
 
 class TestGraphGeneration(unittest.TestCase):
     def setUp(self):
@@ -84,29 +105,29 @@ class TestGraphGeneration(unittest.TestCase):
 
     def test_parse_view_definition(self):
         """Test parsing a simple view definition"""
-        edges, node_types, db_stats = parse_vql(self.view_query)
-        
+        edges, node_types, db_stats = mock_parse_sql(self.view_query)
+
         # Check edges
         self.assertIn(("source_table", "simple_view"), edges)
-        
+
         # Check node types
         self.assertEqual(node_types["simple_view"]["type"], "view")
         self.assertEqual(node_types["simple_view"]["database"], "db1")
         self.assertEqual(node_types["source_table"]["type"], "table")
         self.assertEqual(node_types["source_table"]["database"], "db2")
-        
+
         # Check database statistics
         self.assertEqual(db_stats["db1"], 1)  # simple_view
         self.assertEqual(db_stats["db2"], 1)  # source_table
 
     def test_parse_table_definition(self):
         """Test parsing a table definition with DATA_LOAD_QUERY"""
-        edges, node_types, db_stats = parse_vql(self.table_query)
-        
+        edges, node_types, db_stats = mock_parse_sql(self.table_query)
+
         # Check edges (dependencies in DATA_LOAD_QUERY)
         self.assertIn(("source_table", "target_table"), edges)
         self.assertIn(("another_table", "target_table"), edges)
-        
+
         # Check node types
         self.assertEqual(node_types["target_table"]["type"], "table")
         self.assertEqual(node_types["target_table"]["database"], "db1")
@@ -114,7 +135,7 @@ class TestGraphGeneration(unittest.TestCase):
         self.assertEqual(node_types["source_table"]["database"], "db2")
         self.assertEqual(node_types["another_table"]["type"], "table")
         self.assertEqual(node_types["another_table"]["database"], "db3")
-        
+
         # Check database statistics
         self.assertEqual(db_stats["db1"], 1)  # target_table
         self.assertEqual(db_stats["db2"], 1)  # source_table
@@ -122,7 +143,7 @@ class TestGraphGeneration(unittest.TestCase):
 
     def test_parse_complex_view(self):
         """Test parsing a complex view with CTEs and subqueries"""
-        edges, node_types, db_stats = parse_vql(self.complex_query)
+        edges, node_types, db_stats = mock_parse_sql(self.complex_query)
 
         # Check database statistics (should be unchanged)
         self.assertEqual(db_stats["db1"], 2)
@@ -139,7 +160,7 @@ class TestGraphGeneration(unittest.TestCase):
         self.assertIn(("table1", "base"), edges)
         self.assertIn(("table2", "base"), edges)
         self.assertIn(("base", "derived"), edges)
-        self.assertIn(("table3", "derived"), edges) # Dependency from EXISTS
+        self.assertIn(("table3", "derived"), edges)  # Dependency from EXISTS
         self.assertIn(("derived", "complex_view"), edges)
         # Check edge for direct dependency in final join
         self.assertIn(("table4", "complex_view"), edges)
@@ -147,7 +168,9 @@ class TestGraphGeneration(unittest.TestCase):
         # Assert direct edges from base tables used in CTEs DO NOT go to final view
         self.assertNotIn(("table1", "complex_view"), edges)
         self.assertNotIn(("table2", "complex_view"), edges)
-        self.assertNotIn(("table3", "complex_view"), edges) # table3 is dependency of derived CTE
+        self.assertNotIn(
+            ("table3", "complex_view"), edges
+        )  # table3 is dependency of derived CTE
 
         # Assert CTE types
         self.assertEqual(node_types["base"]["type"], "cte_view")
@@ -157,12 +180,12 @@ class TestGraphGeneration(unittest.TestCase):
         """Test handling of invalid SQL input"""
         invalid_sql = "This is not SQL at all"
         with self.assertRaises(InvalidSQLError):
-            parse_vql(invalid_sql)
+            mock_parse_sql(invalid_sql)
 
     def test_empty_input(self):
         """Test handling of empty input"""
         with self.assertRaises(InvalidSQLError):
-            parse_vql("")
+            mock_parse_sql("")
 
     def test_node_type_inference(self):
         """Test node type inference based on naming patterns"""
@@ -174,9 +197,9 @@ class TestGraphGeneration(unittest.TestCase):
         CREATE OR REPLACE VIEW db1.wv_work_view AS SELECT 1;
         CREATE OR REPLACE VIEW db1.u_union_view AS SELECT 1;
         """
-        
-        edges, node_types, db_stats = parse_vql(view_patterns)
-        
+
+        edges, node_types, db_stats = mock_parse_sql(view_patterns)
+
         # Check that all nodes with view-like prefixes are typed as views
         self.assertEqual(node_types["v_test_view"]["type"], "view")
         self.assertEqual(node_types["iv_interface_view"]["type"], "view")
@@ -193,9 +216,9 @@ class TestGraphGeneration(unittest.TestCase):
         CREATE OR REPLACE TABLE db2.table2 
         DATA_LOAD_QUERY = 'SELECT * FROM db1.table3';
         """
-        
-        edges, node_types, db_stats = parse_vql(multi_db_query)
-        
+
+        edges, node_types, db_stats = mock_parse_sql(multi_db_query)
+
         # Check that each database is counted correctly
         self.assertEqual(db_stats["db1"], 3)  # view1, view2, table3
         self.assertEqual(db_stats["db2"], 2)  # table1, table2
@@ -208,7 +231,7 @@ class TestGraphGeneration(unittest.TestCase):
              t2 AS (SELECT * FROM db2.source_table)
         SELECT * FROM t1 JOIN t2 ON t1.id = t2.id;
         """
-        edges, node_types, db_stats = parse_vql(duplicate_deps)
+        edges, node_types, db_stats = mock_parse_sql(duplicate_deps)
 
         # *** UPDATED Edge Assertions ***
         # Should have edges from source to each CTE, and from each CTE to target
@@ -218,7 +241,9 @@ class TestGraphGeneration(unittest.TestCase):
         self.assertIn(("t2", "target_view"), edges)
 
         # Assert the direct edge count is 0
-        edge_count_direct = len([e for e in edges if e == ("source_table", "target_view")])
+        edge_count_direct = len(
+            [e for e in edges if e == ("source_table", "target_view")]
+        )
         self.assertEqual(edge_count_direct, 0)
 
         # Assert CTE types
@@ -257,41 +282,90 @@ class TestGraphGeneration(unittest.TestCase):
                 SELECT * FROM inner_cte
             )
             SELECT * FROM outer_cte;
-            """
+            """,
         ]
 
         for idx, test_case in enumerate(cte_test_cases):
+            # Process each test case
+            edges, node_types, _ = mock_parse_sql(test_case)
             with self.subTest(case=idx):
-                edges, node_types, _ = parse_vql(test_case)
-
                 if idx == 0:  # Simple CTE
-                    self.assertEqual(node_types["base_data"]["type"], "cte_view", f"Case {idx}: base_data type mismatch")
-                    self.assertIn(("source_table", "base_data"), edges, f"Case {idx}: Missing source_table -> base_data edge")
-                    self.assertIn(("base_data", "simple_cte_view"), edges, f"Case {idx}: Missing base_data -> simple_cte_view edge")
+                    # Assert edge from source to CTE exists
+                    self.assertEqual(
+                        node_types["base_data"]["type"],
+                        "cte_view",
+                        f"Case {idx}: base_data type mismatch",
+                    )
+                    self.assertIn(
+                        ("source_table", "base_data"),
+                        edges,
+                        f"Case {idx}: Missing source_table -> base_data edge",
+                    )
+                    self.assertIn(
+                        ("base_data", "simple_cte_view"),
+                        edges,
+                        f"Case {idx}: Missing base_data -> simple_cte_view edge",
+                    )
 
                 elif idx == 1:  # Multiple CTEs
-                    self.assertEqual(node_types["first_cte"]["type"], "cte_view", f"Case {idx}: first_cte type mismatch")
-                    self.assertEqual(node_types["second_cte"]["type"], "cte_view", f"Case {idx}: second_cte type mismatch")
-                    self.assertIn(("table1", "first_cte"), edges, f"Case {idx}: Missing table1 -> first_cte edge")
-                    self.assertIn(("table2", "second_cte"), edges, f"Case {idx}: Missing table2 -> second_cte edge")
-                    self.assertIn(("first_cte", "multi_cte_view"), edges, f"Case {idx}: Missing first_cte -> multi_cte_view edge")
-                    self.assertIn(("second_cte", "multi_cte_view"), edges, f"Case {idx}: Missing second_cte -> multi_cte_view edge")
+                    self.assertEqual(
+                        node_types["first_cte"]["type"],
+                        "cte_view",
+                        f"Case {idx}: first_cte type mismatch",
+                    )
+                    self.assertEqual(
+                        node_types["second_cte"]["type"],
+                        "cte_view",
+                        f"Case {idx}: second_cte type mismatch",
+                    )
+                    self.assertIn(
+                        ("table1", "first_cte"),
+                        edges,
+                        f"Case {idx}: Missing table1 -> first_cte edge",
+                    )
+                    self.assertIn(
+                        ("table2", "second_cte"),
+                        edges,
+                        f"Case {idx}: Missing table2 -> second_cte edge",
+                    )
+                    self.assertIn(
+                        ("first_cte", "multi_cte_view"),
+                        edges,
+                        f"Case {idx}: Missing first_cte -> multi_cte_view edge",
+                    )
+                    self.assertIn(
+                        ("second_cte", "multi_cte_view"),
+                        edges,
+                        f"Case {idx}: Missing second_cte -> multi_cte_view edge",
+                    )
 
                 elif idx == 2:  # Nested CTEs
                     # Note: Simple parenthesis balancing might struggle with truly nested *definitions*
                     # like WITH outer AS (WITH inner AS (...) SELECT ...)
                     # The current parser might flatten this slightly, need to verify actual output
                     # Assuming the parser handles simple sequence like the example:
-                    self.assertEqual(node_types["outer_cte"]["type"], "cte_view", f"Case {idx}: outer_cte type mismatch")
+                    self.assertEqual(
+                        node_types["outer_cte"]["type"],
+                        "cte_view",
+                        f"Case {idx}: outer_cte type mismatch",
+                    )
                     # struggles with nested CTEs, so we check the outer CTE only, as nested with statements are not that common
-                    #self.assertEqual(node_types["inner_cte"]["type"], "cte_view", f"Case {idx}: inner_cte type mismatch")
-                    #self.assertIn(("source_table", "inner_cte"), edges, f"Case {idx}: Missing source_table -> inner_cte edge")
-                    self.assertIn(("inner_cte", "outer_cte"), edges, f"Case {idx}: Missing inner_cte -> outer_cte edge")
-                    self.assertIn(("outer_cte", "nested_cte_view"), edges, f"Case {idx}: Missing outer_cte -> nested_cte_view edge")
+                    # self.assertEqual(node_types["inner_cte"]["type"], "cte_view", f"Case {idx}: inner_cte type mismatch")
+                    # self.assertIn(("source_table", "inner_cte"), edges, f"Case {idx}: Missing source_table -> inner_cte edge")
+                    self.assertIn(
+                        ("inner_cte", "outer_cte"),
+                        edges,
+                        f"Case {idx}: Missing inner_cte -> outer_cte edge",
+                    )
+                    self.assertIn(
+                        ("outer_cte", "nested_cte_view"),
+                        edges,
+                        f"Case {idx}: Missing outer_cte -> nested_cte_view edge",
+                    )
 
     def test_with_cte_query(self):
         """Test parsing of a query with CTEs and parameters"""
-        edges, node_types, db_stats = parse_vql(self.with_cte_query)
+        edges, node_types, db_stats = mock_parse_sql(self.with_cte_query)
 
         # Check edges for each dependency level
         self.assertIn(("i_bv_address_register_kartverket", "union_registers"), edges)
@@ -303,10 +377,14 @@ class TestGraphGeneration(unittest.TestCase):
         self.assertEqual(node_types["union_registers"]["database"], "")
         self.assertEqual(node_types["v_address_register_all"]["type"], "view")
         self.assertEqual(node_types["v_address_register_all"]["database"], "")
-        self.assertEqual(node_types["i_bv_address_register_kartverket"]["type"], "table")
+        self.assertEqual(
+            node_types["i_bv_address_register_kartverket"]["type"], "table"
+        )
         self.assertEqual(node_types["i_bv_address_register_no"]["type"], "table")
 
         # Check database statistics
         self.assertEqual(db_stats, {})
-if __name__ == '__main__':
+
+
+if __name__ == "__main__":
     unittest.main()
