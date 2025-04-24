@@ -55,6 +55,12 @@ packages = ["src"]
 [tool.coverage.run]
 omit = ["src/plotly_vis.py"]
 
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.15.0",
+    "pytest>=8.3.5",
+    "pytest-cov>=4.0",
+]
 
 [dependency-groups]
 dev = [
@@ -62,3 +68,4 @@ dev = [
     "pytest>=8.3.5",
     "pytest-cov>=4.0",
 ]
+
