@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dataflow-generator"
+name = "data-flow-generator"
 version = "0.1.0"
 description = "Interactive data flow visualization tool for database dumps"
 readme = "README.md"
