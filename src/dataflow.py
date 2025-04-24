@@ -13,8 +13,10 @@ import itertools
 import threading
 import sys
 import time
+from pathlib import Path # Add Path import
 from rapidfuzz import process
 from typing import List, Dict, Optional
+from src import path_utils # Import the new utility module
 
 # Constants
 SQL_EXTENSIONS = [
@@ -539,12 +541,9 @@ def main():
             clear_screen()
             print(f"{Fore.RED}Metadata has no tables or views{Style.RESET_ALL}")
             input("Press Enter to quit...")
-            return
-
-        # Ensure output directory exists
-        output_folder = os.path.join(os.getcwd(), "generated-image")
-        if not os.path.exists(output_folder):
-            os.makedirs(output_folder)
+        # Use the standard generated image directory from path_utils
+        # path_utils ensures the directory exists on import
+        output_folder = path_utils.GENERATED_IMAGE_DIR
 
         # Diagram type selection loop
         while True:
@@ -578,8 +577,8 @@ def main():
                     draw_complete_data_flow,
                     edges,
                     node_types,
-                    output_folder,
-                    os.path.basename(metadata_file).split(".")[0],
+                    str(output_folder), # Pass path as string
+                    Path(metadata_file).stem, # Use Pathlib for consistency
                     draw_edgeless=(True if draw_edgeless == 1 else False),
                 )
             else:
@@ -600,14 +599,16 @@ def main():
                     edges,
                     node_types,
                     focus_nodes=updated_nodes,
-                    save_path=output_folder,
-                    file_name=os.path.basename(metadata_file).split(".")[0],
+                    save_path=str(output_folder), # Pass path as string
+                    file_name=Path(metadata_file).stem, # Use Pathlib for consistency
                     see_ancestors=choices.get("Ancestors"),
                     see_descendants=choices.get("Descendants"),
                 )
 
             print(f"Flow diagram created {Fore.GREEN}successfully!{Style.RESET_ALL}")
-            print(f"The generated flow diagram can be found in the folder: {os.path.relpath(output_folder, os.getcwd())}")
+            # Use the absolute path from path_utils
+            print(f"The generated flow diagram can be found in the folder: {output_folder}")
+            print(f"Standard data directory: {path_utils.DATA_FLOW_BASE_DIR}")
             if input("Press 'c' to continue with other, all other presses exits program...") != "c":
                 # Exit program
                 sys.exit()

@@ -39,11 +39,11 @@ def create_pyvis_figure(
     }
     max_degree = max(degrees.values()) if degrees else 1
     min_size, max_size = 15, 45 # Node size range
-
+    epsilon = 1e-6 # Small value to avoid division by zero
     for node in graph.nodes():
         node_degree = degrees.get(node, 0)
         # Scale size logarithmically or linearly - linear used here
-        size = min_size + (node_degree / max_degree) * (max_size - min_size)
+        size = min_size + (node_degree / (max_degree + epsilon)) * (max_size - min_size)
         # Ensure size doesn't exceed max_size (can happen if max_degree is 0)
         size = min(size, max_size)
 
@@ -109,7 +109,7 @@ def create_pyvis_figure(
                 "align": "center",
             },
             title=hover_text, # HTML tooltip content
-            mass=1 + node_degree / max_degree * 2, # Influence physics
+            mass=1 + node_degree / (max_degree + epsilon) * 2, # Influence physics
             fixed=False, # Allow physics engine to move node
         )
 
