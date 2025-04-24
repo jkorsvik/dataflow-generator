@@ -1,8 +1,7 @@
 # Data Flow Visualization Tool
 
-[![CI](https://github.com/jkorsvik/dataflow/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jkorsvik/dataflow/actions/workflows/ci.yml)
-[![Tests](https://github.com/jkorsvik/dataflow/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/jkorsvik/dataflow/actions/workflows/test.yml)
-[![Coverage](https://github.com/jkorsvik/dataflow/raw/main/coverage.svg)](https://github.com/jkorsvik/dataflow/actions/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/jkorsvik/dataflow-generator/ci.yml?branch=main&label=CI)](https://github.com/jkorsvik/dataflow-generator/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/github/actions/workflow/status/jkorsvik/dataflow-generator/ci.yml?branch=main&label=Tests&job=test)](https://github.com/jkorsvik/dataflow-generator/actions/workflows/ci.yml)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](https://www.python.org/)
@@ -12,12 +11,7 @@
 
 This tool generates visual representations of data flows based on Denodo metadata exported in a `.vql` file. It can produce both complete data flow diagrams and focused data flow diagrams for specified views and tables.
 
-## Changelog
 
-### 0.1.1 (2025-04-24)
-- Bumped project version to 0.1.1
-- Added keywords and long_description_content_type in pyproject.toml for PyPI
-- Switched CI publish step to use Twine upload
 
 ## Installation
 
