@@ -87,7 +87,7 @@ jobs:
 
       - name: Trigger publish workflow
         if: github.ref == 'refs/heads/main'
-        uses: peter-evans/workflow-dispatch@v1
+        uses: peter-evans/workflow-dispatch@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
