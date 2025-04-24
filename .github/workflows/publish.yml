@@ -3,6 +3,8 @@ name: Publish Python Package
 on:
   release:
     types: [published]
+  workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -13,7 +15,7 @@ jobs:
     name: Build and publish Python distributions to PyPI
     runs-on: ubuntu-latest
     container: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
-    environment: pypi
+    environment: production
 
     steps:
       - name: Checkout repository
