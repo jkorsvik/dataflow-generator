@@ -6,12 +6,12 @@ from typing import List, Tuple, Dict, Optional, Union
 from pyvis.network import Network
 import json
 import textwrap
-import plotly.graph_objects as go  # Added import for Plotly graph objects
 import math  # For ceiling function
+import webbrowser
 
 
 def create_pyvis_figure(
-    graph: Union[nx.DiGraph, nx.Graph], # DO NOT EDIT THIS LINE
+    graph: Union[nx.DiGraph, nx.Graph],  # DO NOT EDIT THIS LINE
     node_types: Dict[str, Dict[str, str]],
     focus_nodes: List[str] = [],
     shake_towards_roots: bool = False,
@@ -27,19 +27,19 @@ def create_pyvis_figure(
         bgcolor="#ffffff",
         font_color="#343434",
         heading="",
-        cdn_resources="in_line", # Use 'local' if you want offline files
+        cdn_resources="in_line",  # Use 'local' if you want offline files
     )
 
     # Calculate degrees for sizing
-    in_degrees = dict(graph.in_degree()) # type: ignore
-    out_degrees = dict(graph.out_degree()) # type: ignore
+    in_degrees = dict(graph.in_degree())  # type: ignore
+    out_degrees = dict(graph.out_degree())  # type: ignore
     degrees = {
         node: in_degrees.get(node, 0) + out_degrees.get(node, 0)
         for node in graph.nodes()
     }
     max_degree = max(degrees.values()) if degrees else 1
-    min_size, max_size = 15, 45 # Node size range
-    epsilon = 1e-6 # Small value to avoid division by zero
+    min_size, max_size = 15, 45  # Node size range
+    epsilon = 1e-6  # Small value to avoid division by zero
     for node in graph.nodes():
         node_degree = degrees.get(node, 0)
         # Scale size logarithmically or linearly - linear used here
@@ -47,23 +47,25 @@ def create_pyvis_figure(
         # Ensure size doesn't exceed max_size (can happen if max_degree is 0)
         size = min(size, max_size)
 
-        #print(node, node_degree, size)  # Debugging output
+        # print(node, node_degree, size)  # Debugging output
         # Get node info - use fallback if somehow missing (shouldn't happen)
-        node_info = node_types.get(node, {"type": "unknown", "database": "", "full_name": node})
-        node_type = node_info.get("type", "unknown") # Use .get for safety
-        #print(node_info)  # Debugging output
+        node_info = node_types.get(
+            node, {"type": "unknown", "database": "", "full_name": node}
+        )
+        node_type = node_info.get("type", "unknown")  # Use .get for safety
+        # print(node_info)  # Debugging output
         # Color mapping
         color_map = {
-            "view": "#4e79a7",     # Blue
-            "table": "#59a14f",     # Green
+            "view": "#4e79a7",  # Blue
+            "table": "#59a14f",  # Green
             "cte_view": "#f9c846",  # Yellow for CTE views
-            "unknown": "#e15759",   # Red (Should be less common now)
-            "datamarket": "#ed7be7", # Purple (Example)
-            "other": "#f28e2c"      # Orange (Example)
+            "unknown": "#e15759",  # Red (Should be less common now)
+            "datamarket": "#ed7be7",  # Purple (Example)
+            "other": "#f28e2c",  # Orange (Example)
         }
-        color = color_map.get(node_type, "#bab0ab") # Default grey for unmapped types
+        color = color_map.get(node_type, "#bab0ab")  # Default grey for unmapped types
 
-        border_color = "#2b2b2b" # Darker border
+        border_color = "#2b2b2b"  # Darker border
         border_width = 1
         font_color = "#343434"
 
@@ -85,57 +87,61 @@ def create_pyvis_figure(
             f"Database: {node_info['database'] or '(default)'}\n"
             f"Connections: {node_degree}\n"
             f"--------------------\n"
-            f"Parents ({len(parents)}):\n" +
-            ("\n".join(f"  • {p}" for p in parents) if parents else "  (None)") +
-            "\n\n" +
-            f"Children ({len(children)}):\n" +
-            ("\n".join(f"  • {c}" for c in children) if children else "  (None)")
+            f"Parents ({len(parents)}):\n"
+            + ("\n".join(f"  • {p}" for p in parents) if parents else "  (None)")
+            + "\n\n"
+            + f"Children ({len(children)}):\n"
+            + ("\n".join(f"  • {c}" for c in children) if children else "  (None)")
         )
 
         # Add node to pyvis network
         nt.add_node(
-            node, # Node ID (base name)
-            label=node, # Label displayed on the node
+            node,  # Node ID (base name)
+            label=node,  # Label displayed on the node
             color=color,
-            shape="dot", # Circle shape
+            shape="dot",  # Circle shape
             size=size,
             borderWidth=border_width,
             borderColor=border_color,
             font={
                 "color": font_color,
                 "size": 12,
-                "strokeWidth": 0, # No text stroke
+                "strokeWidth": 0,  # No text stroke
                 # "strokeColor": "#ffffff", # Not needed if strokeWidth is 0
                 "align": "center",
             },
-            title=hover_text, # HTML tooltip content
-            mass=1 + node_degree / (max_degree + epsilon) * 2, # Influence physics
-            fixed=False, # Allow physics engine to move node
+            title=hover_text,  # HTML tooltip content
+            mass=1 + node_degree / (max_degree + epsilon) * 2,  # Influence physics
+            fixed=False,  # Allow physics engine to move node
         )
 
     # Add edges to pyvis network
     for u, v in graph.edges():
-        if u in graph.nodes() and v in graph.nodes(): # Ensure both nodes exist in the graph
+        if (
+            u in graph.nodes() and v in graph.nodes()
+        ):  # Ensure both nodes exist in the graph
             nt.add_edge(
                 u,
                 v,
                 color={
-                    "color": "#cccccc",       # Light grey edge
+                    "color": "#cccccc",  # Light grey edge
                     "opacity": 0.7,
-                    "highlight": "#e60049",   # Red highlight color
-                    "hover": "#e60049",       # Red hover color
+                    "highlight": "#e60049",  # Red highlight color
+                    "hover": "#e60049",  # Red hover color
                 },
-                width=1.5,                # Default edge width
-                hoverWidth=2.5,           # Width on hover
-                selectionWidth=2.5,       # Width when selected
+                width=1.5,  # Default edge width
+                hoverWidth=2.5,  # Width on hover
+                selectionWidth=2.5,  # Width when selected
                 # Smooth edges look better for hierarchical usually
                 smooth={
                     "enabled": True,
                     "type": "cubicBezier",
-                    "forceDirection": "vertical", # Changed for better hierarchical flow sometimes
-                    "roundness": 0.4
+                    "forceDirection": "vertical",  # Changed for better hierarchical flow sometimes
+                    "roundness": 0.4,
                 },
-                arrows={"to": {"enabled": True, "scaleFactor": 0.6}}, # Arrow pointing to target
+                arrows={
+                    "to": {"enabled": True, "scaleFactor": 0.6}
+                },  # Arrow pointing to target
             )
     # --- Use the EXACT Initial Pyvis options provided by the user ---
     # <<< PASTE THE USER'S PROVIDED initial_options DICTIONARY HERE >>>
@@ -730,18 +736,26 @@ def inject_controls_and_styles(
             html += f'<select id="{key_path}">{opts_html}</select>'
         elif key_path == "physics.hierarchicalRepulsion.avoidOverlap":
             # Always render avoidOverlap as a slider with min=0, max=1, step=0.01
-            html += f'<input type="range" id="{key_path}" min="0" max="1" step="0.01" value="{value}">' \
-                    f'<span class="value-display" id="{key_path}_value">{value:.2f}</span>'
+            html += (
+                f'<input type="range" id="{key_path}" min="0" max="1" step="0.01" value="{value}">'
+                f'<span class="value-display" id="{key_path}_value">{value:.2f}</span>'
+            )
         elif key_path == "nodes.size":
             # Add a slider for node size with a reasonable range
-            html += f'<input type="range" id="{key_path}" min="5" max="100" step="1" value="{value}">' \
-                    f'<span class="value-display" id="{key_path}_value">{value}</span>'
+            html += (
+                f'<input type="range" id="{key_path}" min="5" max="100" step="1" value="{value}">'
+                f'<span class="value-display" id="{key_path}_value">{value}</span>'
+            )
         elif key_path == "nodes.scaling.min":
-            html += f'<input type="range" id="{key_path}" min="1" max="100" step="1" value="{value}">' \
-                    f'<span class="value-display" id="{key_path}_value">{value}</span>'
+            html += (
+                f'<input type="range" id="{key_path}" min="1" max="100" step="1" value="{value}">'
+                f'<span class="value-display" id="{key_path}_value">{value}</span>'
+            )
         elif key_path == "nodes.scaling.max":
-            html += f'<input type="range" id="{key_path}" min="1" max="1000" step="1" value="{value}">' \
-                    f'<span class="value-display" id="{key_path}_value">{value}</span>'
+            html += (
+                f'<input type="range" id="{key_path}" min="1" max="1000" step="1" value="{value}">'
+                f'<span class="value-display" id="{key_path}_value">{value}</span>'
+            )
         elif isinstance(value, (int, float)):
             if (
                 "delay" in key_path.lower()
@@ -2337,7 +2351,7 @@ def inject_controls_and_styles(
         }});
     </script>
     """)
-    
+
     # --- 4. Injection ---
     html_content = html_content.replace("</head>", custom_css + "\n</head>", 1)
     html_content = html_content.replace(
@@ -2346,14 +2360,17 @@ def inject_controls_and_styles(
 
     return html_content
 
+
 def inject_html_doctype(html_content: str) -> str:
     """Injects the HTML doctype into the HTML content."""
     doctype = "<!DOCTYPE html>"
     return doctype + "\n" + html_content
 
+
 def draw_pyvis_html(
     edges: List[Tuple[str, str]],
     node_types: Dict[str, Dict[str, str]],
+    auto_open: bool = False,  # Add option to auto-open in browser
     save_path: str = "",
     file_name: str = "",
     draw_edgeless: bool = False,
@@ -2377,7 +2394,12 @@ def draw_pyvis_html(
             return
         G = G.subgraph(nodes_to_draw).copy()
 
-    final_node_types = {node: node_types.get(node, {"type": "unknown", "database": "", "full_name": node}) for node in G.nodes()}
+    final_node_types = {
+        node: node_types.get(
+            node, {"type": "unknown", "database": "", "full_name": node}
+        )
+        for node in G.nodes()
+    }
     if not G.nodes():
         print("Warning: Graph is empty for Pyvis HTML.")
         return
@@ -2407,6 +2429,17 @@ def draw_pyvis_html(
         with open(html_file_path, "w", encoding="utf-8") as file:
             file.write(modified_html_content)
         resolved_html_file_path = Path(html_file_path).resolve()
-        print(f"Successfully generated Pyvis HTML: \033]8;;file://{resolved_html_file_path}\033\\{resolved_html_file_path}\033]8;;\033\\")
+        print(f"Successfully generated Pyvis HTML: {resolved_html_file_path}")
+
+        # If auto_open is enabled, open the file in the default browser
+        if auto_open:
+            try:
+                print("Opening in default browser...")
+                webbrowser.open(f"file://{resolved_html_file_path}")
+            except Exception as e:
+                print(f"Could not open browser automatically: {e}")
+                print(
+                    f"Please open this URL manually: file://{resolved_html_file_path}"
+                )
     except Exception as e:
         print(f"Error writing Pyvis HTML file {html_file_path}: {e}")

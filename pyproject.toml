@@ -4,12 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "data-flow-generator"
-version = "0.1.4"
+version = "0.1.5"
 description = "Interactive data flow visualization tool for database dumps"
 readme = "README.md"
-authors = [
-    { name = "Jon-Mikkel Korsvik", email = "jkorsvik@outlook.com" }
-]
+authors = [{ name = "Jon-Mikkel Korsvik", email = "jkorsvik@outlook.com" }]
 license = { text = "MIT" }
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -22,12 +20,10 @@ keywords = ["dataflow", "visualization", "vql", "denodo", "diagram"]
 requires-python = ">=3.10"
 dependencies = [
     "colorama==0.4.6",
-    "kaleido==0.2.1",
     "narwhals==1.33.0",
     "networkx==3.3",
     "numpy>=2.2.4",
     "packaging>=24.2",
-    "plotly==6.0.1",
     "python-dotenv==1.0.1",
     "pyvis>=0.3.2",
     "rapidfuzz==3.6.1",
@@ -41,7 +37,8 @@ dependencies = [
     "types-pygments>=2.19.0.20250305",
     "types-colorama>=0.4.15.20240311",
     "types-networkx>=3.4.2.20250319",
-    "platformdirs>=4.2.2", # Added for platform-agnostic data directory
+    "platformdirs>=4.2.2",             # Added for platform-agnostic data directory
+    "sqlfluff>=3.4.0",
 ]
 
 [project.scripts]
@@ -57,18 +54,10 @@ Documentation = "https://github.com/jkorsvik/dataflow-generator/blob/main/README
 packages = ["src"]
 
 [tool.coverage.run]
-omit = ["src/plotly_vis.py"]
+omit = []
 
 [project.optional-dependencies]
-dev = [
-    "mypy>=1.15.0",
-    "pytest>=8.3.5",
-    "pytest-cov>=4.0",
-]
+dev = ["mypy>=1.15.0", "pytest>=8.3.5", "pytest-cov>=4.0"]
 
 [dependency-groups]
-dev = [
-    "mypy>=1.15.0",
-    "pytest>=8.3.5",
-    "pytest-cov>=4.0",
-]
+dev = ["mypy>=1.15.0", "pytest>=8.3.5", "pytest-cov>=4.0"]
