@@ -28,10 +28,6 @@ dependencies = [
     "rapidfuzz==3.13.0",
     "readchar==4.2.1",
     "questionary>=2.0.1",
-    "mypy>=1.15.0",
-    "pytest-cov==6.1.1",
-    "coverage-badge>=1.1.2",
-    "anybadge>=1.16.0",
     "pandas-stubs>=2.2.3.250308",
     "types-pygments>=2.19.0.20250305",
     "types-colorama>=0.4.15.20240311",
@@ -53,12 +49,12 @@ Documentation = "https://github.com/jkorsvik/dataflow-generator/blob/main/README
 omit = []
 
 [project.optional-dependencies]
-dev = ["mypy>=1.15.0", "pytest>=8.3.5", "pytest-cov>=4.0"]
+dev = ["mypy>=1.15.0", "pytest>=8.3.5", "pytest-cov>=4.0", "anybadge>=1.16.0"]
 
 [dependency-groups]
-dev = ["mypy>=1.15.0", "pytest>=8.3.5", "pytest-cov>=4.0"]
+dev = ["mypy>=1.15.0", "pytest>=8.3.5", "pytest-cov>=4.0", "anybadge>=1.16.0"]
 
 # Add this section to map the src directory to the package name
 [tool.setuptools]
-package-dir = {"data_flow_generator" = "src"}
+package-dir = { "data_flow_generator" = "src" }
 packages = ["data_flow_generator"]
