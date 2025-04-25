@@ -10,12 +10,11 @@
 
 
 This tool generates visual representations of data flows based on Denodo metadata exported in a `.vql` file. It can produce both complete data flow diagrams and focused data flow diagrams for specified views and tables.
+### Demonstration of the tool's capabilities
 
-### Demonstration of the tool's capabilities 
-[![Data Flow Generator Demo](https://github.com/jkorsvik/media_repo/raw/main/data-flow-generator/data-flow-generator-demo-thumbnail.png)](https://github.com/jkorsvik/media_repo/raw/main/data-flow-generator/data-flow-generator-demo.mp4)
+![Data Flow Generator Demo](data-flow-generator/data-flow-generator-demo.gif)
 
-> **Note:** GitHub READMEs do not support embedded video playback.  
-> Click the image above to view the demo video.
+> **Note:** The animation above demonstrates some of the tool's features and workflow.
 
 ## Installation
 
