@@ -4,15 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "data-flow-generator"
-version = "0.1.7"
+version = "0.1.8"
 description = "Interactive data flow visualization tool for database dumps"
 readme = "README.md"
 authors = [{ name = "Jon-Mikkel Korsvik", email = "jkorsvik@outlook.com" }]
-license = { text = "MIT" }
+license = "MIT"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
 ]
@@ -49,7 +48,6 @@ data-flow-command = "src.dataflow_command:main"
 [project.urls]
 Homepage = "https://github.com/jkorsvik/dataflow-generator"
 Documentation = "https://github.com/jkorsvik/dataflow-generator/blob/main/README.md"
-
 
 [tool.coverage.run]
 omit = []

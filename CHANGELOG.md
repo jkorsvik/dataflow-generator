@@ -1,5 +1,10 @@
 ## Changelog
 
+### 0.1.8 (2025-04-25)
+- Add MANIFEST.in for improved packaging
+- Update pyproject.toml for SPDX license and packaging improvements
+- Initialize __init__.py for parsers module
+
 ### 0.1.5 (2025-04-25)
 - Added browser auto-open feature for generated diagrams
 - Made browser auto-open configurable via both CLI and command-line interface
