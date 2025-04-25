@@ -1,12 +1,12 @@
 import json
 import os
-import re
+
 import networkx as nx
 from typing import List, Tuple, Dict, TypedDict, Union, Set, Any, Optional, cast  # noqa: F401
 
-from src import pyvis_mod
-from src.dataflow_structs import NodeInfo
-from src.parser_register import guess_database_type, _PARSER_REGISTRY, DatabaseType
+from . import pyvis_mod
+from .dataflow_structs import NodeInfo
+from .parser_register import guess_database_type, _PARSER_REGISTRY, DatabaseType
 
 
 def parse_dump(

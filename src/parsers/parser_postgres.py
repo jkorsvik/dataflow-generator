@@ -6,8 +6,8 @@ from typing import List, Tuple, Dict, Set, Optional, Union
 from sqlfluff.core import Linter, SQLLintError
 from sqlfluff.core.parser.segments.base import BaseSegment
 
-from src.dataflow_structs import NodeInfo
-from src.exceptions import InvalidSQLError
+from ..dataflow_structs import NodeInfo
+from ..exceptions import InvalidSQLError
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")

@@ -3,8 +3,8 @@ import os
 import re
 from typing import List, Tuple, Dict, TypedDict, Union, Set, Any, Optional  # noqa: F401
 
-from src.dataflow_structs import NodeInfo
-from src.exceptions import InvalidSQLError
+from ..dataflow_structs import NodeInfo
+from ..exceptions import InvalidSQLError
 
 SCALING_CONSTANT: float = 2
 SQL_PATTERNS = [

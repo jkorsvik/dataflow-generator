@@ -3,20 +3,23 @@ import re
 import readchar
 import questionary
 from colorama import init, Fore, Style, Back
-from src.generate_data_flow import (
+# Use relative imports for internal modules to work both when installed and during development
+
+    # Fall back to relative import (when running from source)
+from .generate_data_flow import (
     draw_focused_data_flow,
     draw_complete_data_flow,
     parse_dump,
 )
+from . import path_utils
 import glob
 import itertools
 import threading
 import sys, webbrowser
 import time
-from pathlib import Path  # Add Path import
+from pathlib import Path
 from rapidfuzz import process
 from typing import List, Dict, Optional, Set
-from src import path_utils  # Import the new utility module
 
 # Constants
 SQL_EXTENSIONS = [

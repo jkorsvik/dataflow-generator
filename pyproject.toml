@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "data-flow-generator"
-version = "0.1.8"
+version = "0.1.9"
 description = "Interactive data flow visualization tool for database dumps"
 readme = "README.md"
 authors = [{ name = "Jon-Mikkel Korsvik", email = "jkorsvik@outlook.com" }]
@@ -41,9 +41,9 @@ dependencies = [
 ]
 
 [project.scripts]
-data-flow-cli = "src.dataflow:main"
-data-flow-generator = "src.dataflow:main"
-data-flow-command = "src.dataflow_command:main"
+data-flow-cli = "data_flow_generator.dataflow:main"
+data-flow-generator = "data_flow_generator.dataflow:main"
+data-flow-command = "data_flow_generator.dataflow_command:main"
 
 [project.urls]
 Homepage = "https://github.com/jkorsvik/dataflow-generator"
@@ -57,3 +57,8 @@ dev = ["mypy>=1.15.0", "pytest>=8.3.5", "pytest-cov>=4.0"]
 
 [dependency-groups]
 dev = ["mypy>=1.15.0", "pytest>=8.3.5", "pytest-cov>=4.0"]
+
+# Add this section to map the src directory to the package name
+[tool.setuptools]
+package-dir = {"data_flow_generator" = "src"}
+packages = ["data_flow_generator"]

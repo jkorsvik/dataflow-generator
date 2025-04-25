@@ -1,5 +1,11 @@
 ## Changelog
 
+### 0.1.9 (2025-04-25)
+- Fixed Python module import issues in the CLI tools
+- Added fallback import mechanism to handle both installed package and source use cases
+- Updated package structure in pyproject.toml for proper installation
+- Improved test environment with conftest.py for better path handling
+
 ### 0.1.8 (2025-04-25)
 - Add MANIFEST.in for improved packaging
 - Update pyproject.toml for SPDX license and packaging improvements

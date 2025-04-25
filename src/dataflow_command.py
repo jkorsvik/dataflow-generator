@@ -1,8 +1,8 @@
 import argparse
 import sys
 from pathlib import Path
-from src import path_utils  # Import the new utility module
-from src.generate_data_flow import (
+from . import path_utils  # Import the new utility module
+from .generate_data_flow import (
     draw_focused_data_flow,
     draw_complete_data_flow,
     parse_dump,
