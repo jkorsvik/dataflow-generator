@@ -1,6 +1,17 @@
 @echo off
 echo Setting up environment for dataflow generator...
 
+REM Check for fd and recommend installation if missing
+where fd >nul 2>nul
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo Optional: For much faster file search, install 'fd' (https://github.com/sharkdp/fd):
+    echo   winget install sharkdp.fd
+    echo   or choco install fd
+    echo   or scoop install fd
+    echo.
+)
+
 REM Check if Python is installed
 python --version >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
@@ -24,4 +35,4 @@ REM Install dependencies
 echo Installing dependencies using uv...
 uv sync
 
-echo Setup complete. To activate the virtual environment, run '.\.venv\Scripts\activate.bat'. To start the app, run 'data-flow-generator'. 
+echo Setup complete. To activate the virtual environment, run '.\.venv\Scripts\activate.bat'. To start the app, run 'data-flow-generator'.

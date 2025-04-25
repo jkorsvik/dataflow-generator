@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "data-flow-generator"
-version = "0.1.9"
+version = "0.2.0"
 description = "Interactive data flow visualization tool for database dumps"
 readme = "README.md"
 authors = [{ name = "Jon-Mikkel Korsvik", email = "jkorsvik@outlook.com" }]
@@ -19,17 +19,17 @@ keywords = ["dataflow", "visualization", "vql", "denodo", "diagram"]
 requires-python = ">=3.10"
 dependencies = [
     "colorama==0.4.6",
-    "narwhals==1.33.0",
-    "networkx==3.3",
+    "narwhals==1.36.0",
+    "networkx==3.4.2",
     "numpy>=2.2.4",
     "packaging>=24.2",
-    "python-dotenv==1.0.1",
+    "python-dotenv==1.1.0",
     "pyvis>=0.3.2",
-    "rapidfuzz==3.6.1",
-    "readchar==4.1.0",
+    "rapidfuzz==3.13.0",
+    "readchar==4.2.1",
     "questionary>=2.0.1",
     "mypy>=1.15.0",
-    "pytest-cov==6.1.0",
+    "pytest-cov==6.1.1",
     "coverage-badge>=1.1.2",
     "anybadge>=1.16.0",
     "pandas-stubs>=2.2.3.250308",

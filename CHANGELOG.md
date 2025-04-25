@@ -1,5 +1,12 @@
 ## Changelog
 
+### 0.2.0 (2025-04-25)
+- Added automatic detection and optional installation of `fd`/`fdfind` for fast file search
+- User is prompted to install `fd` if not found, with persistent opt-out stored in app data directory
+- File search logic now respects user preference and falls back to Python search if declined
+- Added persistent settings storage in `src/path_utils.py`
+- Refactored `collect_sql_files` to use new fd installation logic
+
 ### 0.1.9 (2025-04-25)
 - Fixed Python module import issues in the CLI tools
 - Added fallback import mechanism to handle both installed package and source use cases

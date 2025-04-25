@@ -1,5 +1,16 @@
 # PowerShell script for Windows setup
 
+# Check for fd and recommend installation if missing
+$fd = Get-Command fd -ErrorAction SilentlyContinue
+if (-not $fd) {
+    Write-Host ""
+    Write-Host "Optional: For much faster file search, install 'fd' (https://github.com/sharkdp/fd):"
+    Write-Host "  winget install sharkdp.fd"
+    Write-Host "  (or) choco install fd"
+    Write-Host "  (or) scoop install fd"
+    Write-Host ""
+}
+
 # Check if Python is installed
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
     Write-Error "Python is not found. Please install Python 3.10 or newer."
@@ -33,4 +44,4 @@ if (-not $uvInstalled) {
 Write-Host "Installing dependencies using uv..."
 uv sync
 
-Write-Host "Setup complete. To activate the virtual environment, run '.\venv\Scripts\Activate.ps1'. To start the app, run 'data-flow-generator'." 
+Write-Host "Setup complete. To activate the virtual environment, run '.\venv\Scripts\Activate.ps1'. To start the app, run 'data-flow-generator'."

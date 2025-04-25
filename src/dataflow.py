@@ -3,9 +3,11 @@ import re
 import readchar
 import questionary
 from colorama import init, Fore, Style, Back
-# Use relative imports for internal modules to work both when installed and during development
-
-    # Fall back to relative import (when running from source)
+import shutil
+import subprocess
+import platform
+import json
+# Fall back to relative import (when running from source)
 from .generate_data_flow import (
     draw_focused_data_flow,
     draw_complete_data_flow,
@@ -71,6 +73,88 @@ def handle_back_key(key: str) -> bool:
         key = key.lower() if len(key) == 1 else key
     return key in [BACK_KEY, ESC_KEY, CTRL_C_KEY, CTRL_D_KEY]
 
+def check_or_install_fd():
+    """
+    Check for fd/fdfind, prompt user to install if missing, and handle persistent opt-out.
+    Returns the path to fd/fdfind if available, else None.
+    """
+    fd_path = shutil.which("fd") or shutil.which("fdfind")
+    if fd_path:
+        return fd_path
+
+    # Check persistent settings
+    settings = path_utils.read_settings()
+    if settings.get("try_install_fd") is False:
+        return None
+
+    # Prompt user
+    print(
+        f"{Fore.YELLOW}The 'fd' (or 'fdfind') command-line tool is not installed. "
+        "It can greatly speed up file searches in this application.{Style.RESET_ALL}"
+    )
+    answer = questionary.select(
+        "Would you like to attempt to install 'fd' now?",
+        choices=[
+            "Yes, install it for me",
+            "No, use slower search this time",
+            "No, and don't ask again",
+        ],
+        default="Yes, install it for me",
+    ).ask()
+
+    if answer == "Yes, install it for me":
+        os_name = platform.system()
+        install_cmd = None
+        if os_name == "Darwin":
+            install_cmd = ["brew", "install", "fd"]
+        elif os_name == "Linux":
+            # Try apt (Debian/Ubuntu), fallback to yum/dnf for RHEL/Fedora
+            if shutil.which("apt"):
+                install_cmd = ["sudo", "apt", "update", "&&", "sudo", "apt", "install", "-y", "fd-find"]
+            elif shutil.which("dnf"):
+                install_cmd = ["sudo", "dnf", "install", "-y", "fd-find"]
+            elif shutil.which("yum"):
+                install_cmd = ["sudo", "yum", "install", "-y", "fd-find"]
+        elif os_name == "Windows":
+            install_cmd = ["choco", "install", "fd", "-y"]
+
+        if install_cmd:
+            print(f"{Fore.BLUE}Attempting to install fd: {' '.join(install_cmd)}{Style.RESET_ALL}")
+            try:
+                # If using apt, need to run two commands (update, then install)
+                if os_name == "Linux" and shutil.which("apt"):
+                    subprocess.run(["sudo", "apt", "update"], check=True)
+                    subprocess.run(["sudo", "apt", "install", "-y", "fd-find"], check=True)
+                else:
+                    subprocess.run(install_cmd, check=True)
+            except Exception as e:
+                print(f"{Fore.RED}Installation failed: {e}{Style.RESET_ALL}")
+                print("You may need to install fd manually.")
+                return None
+
+            # Check again
+            fd_path = shutil.which("fd") or shutil.which("fdfind")
+            if fd_path:
+                print(f"{Fore.GREEN}fd installed successfully!{Style.RESET_ALL}")
+                settings["try_install_fd"] = True
+                path_utils.write_settings(settings)
+                return fd_path
+            else:
+                print(f"{Fore.RED}fd installation did not succeed. Please install it manually if you want faster file search.{Style.RESET_ALL}")
+                return None
+        else:
+            print(f"{Fore.RED}Automatic installation is not supported on your OS. Please install 'fd' manually.{Style.RESET_ALL}")
+            return None
+
+    elif answer == "No, and don't ask again":
+        settings["try_install_fd"] = False
+        path_utils.write_settings(settings)
+        return None
+    else:
+        # Just use slower search this time
+        return None
+
+# --- END FD/FDFIND LOGIC ---
 
 class Node:
     """
@@ -92,7 +176,7 @@ def clear_screen():
     """
     Clears the terminal screen.
     """
-    #os.system("cls" if os.name == "nt" else "clear")
+    os.system("cls" if os.name == "nt" else "clear")
 
 
 def is_sql_file(file_path: str) -> bool:
@@ -246,12 +330,16 @@ def validate_sql_content(file_path: str) -> bool:
         return False
 
 
+
+
 def collect_sql_files(search_dirs: Optional[List[Path]] = None) -> List[str]:
     """
     Collect all SQL files recursively from specified base directories.
 
     If no directories are provided, defaults to CWD, User Downloads,
     User Documents, and the standard data directory.
+
+    Uses the 'fd' command if available for fast file search, otherwise falls back to pure Python.
 
     Args:
         search_dirs (Optional[List[Path]]): List of base directories to search.
@@ -268,14 +356,55 @@ def collect_sql_files(search_dirs: Optional[List[Path]] = None) -> List[str]:
         ]
 
     found_files: Set[Path] = set()
-    for base_dir in search_dirs:
-        if not base_dir.is_dir():
-            continue  # Skip if dir doesn't exist
-        for ext in SQL_EXTENSIONS:
+    fd_path = shutil.which("fd") or shutil.which("fdfind")
+    extensions = [ext.lstrip(".") for ext in SQL_EXTENSIONS]
+
+    if fd_path:
+        # Use fd for each search dir, collecting results
+        for base_dir in search_dirs:
+            if not base_dir.is_dir():
+                continue
             try:
-                # Use rglob for recursive search, converting to absolute paths
-                found_files.update(p.resolve() for p in base_dir.rglob(f"*{ext}"))
-            except (PermissionError, FileNotFoundError) as e:
+                # Build fd command: fd --type f --no-ignore --extension sql --extension vql ... .
+                cmd = [fd_path, "--type", "f", "--no-ignore"]
+                for ext in extensions:
+                    cmd += ["--extension", ext]
+                cmd.append(".")
+                result = subprocess.run(
+                    cmd,
+                    cwd=str(base_dir),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                    check=False,
+                )
+                for line in result.stdout.splitlines():
+                    try:
+                        full_path = Path(base_dir, line).resolve()
+                        found_files.add(full_path)
+                    except Exception:
+                        continue
+            except Exception as e:
+                print(
+                    f"{Fore.YELLOW}Warning: Could not search {base_dir} with fd: {e}{Style.RESET_ALL}"
+                )
+    else:
+        # Fallback to pure Python
+        for base_dir in search_dirs:
+            if not base_dir.is_dir():
+                continue  # Skip if dir doesn't exist
+            try:
+                for root, dirs, files in os.walk(base_dir, topdown=True, onerror=lambda e: print(
+                    f"{Fore.YELLOW}Warning: Could not access {getattr(e, 'filename', base_dir)}: {getattr(e, 'strerror', e)}{Style.RESET_ALL}"
+                )):
+                    for file in files:
+                        if file.lower().endswith(tuple(SQL_EXTENSIONS)):
+                            try:
+                                full_path = Path(os.path.join(root, file)).resolve()
+                                found_files.add(full_path)
+                            except Exception:
+                                continue
+            except Exception as e:
                 print(
                     f"{Fore.YELLOW}Warning: Could not search {base_dir}: {e}{Style.RESET_ALL}"
                 )
@@ -312,7 +441,7 @@ def select_metadata(allow_back: bool = False) -> Optional[str]:
         Optional[str]: The selected file path or None if selection was cancelled
     """
     base_choices = [
-        "Browse SQL Files",
+        "Browse SQL Files in Current Directory",
         "Browse Files in Standard Locations",  # Add this option
         "Drop/Paste File Path",
         "Search in directory",
@@ -337,9 +466,9 @@ def select_metadata(allow_back: bool = False) -> Optional[str]:
     if choice == "Drop/Paste File Path":
         return handle_file_drop(allow_back=allow_back)
 
-    elif choice == "Browse SQL Files":
+    elif choice == "Browse SQL Files in Current Directory":
         # Browse only in current directory
-        files = collect_sql_files([Path.cwd()])
+        files = run_with_loading(collect_sql_files, [Path.cwd()])
 
         # Handle no files found in CWD
         if not files:
@@ -354,6 +483,7 @@ def select_metadata(allow_back: bool = False) -> Optional[str]:
 
             # Search in standard locations if requested
             if proceed:
+                print(f"\n{Fore.BLUE}Searching for SQL files in standard locations...{Style.RESET_ALL}")
                 return select_metadata(allow_back=True)
             else:
                 # User doesn't want to search elsewhere
@@ -375,7 +505,7 @@ def select_metadata(allow_back: bool = False) -> Optional[str]:
 
     elif choice == "Browse Files in Standard Locations":
         # Use expanded search with standard locations
-        files = collect_sql_files()
+        files = run_with_loading(collect_sql_files)
         if not files:
             print(
                 f"{Fore.YELLOW}No SQL files found in standard locations.{Style.RESET_ALL}"
@@ -392,7 +522,7 @@ def select_metadata(allow_back: bool = False) -> Optional[str]:
         ).ask()
 
     else:  # Search in directory
-        files = collect_sql_files()  # Use all standard locations
+        files = run_with_loading(collect_sql_files)  # Use all standard locations
         if not files:
             print(
                 f"{Fore.YELLOW}No SQL files found in default search locations.{Style.RESET_ALL}"
@@ -549,6 +679,8 @@ def search_node(nodes: List[Node]):
     search_query = ""
     current_index = 0
     term_height = os.get_terminal_size().lines
+    node_names = [node.name for node in nodes]
+    max_results = min(100, term_height * 2)  # Limit fuzzy results for speed
 
     while True:
         clear_screen()
@@ -558,8 +690,8 @@ def search_node(nodes: List[Node]):
         matches = (
             process.extract(
                 search_query,
-                [node.name for node in nodes],
-                limit=len(nodes),
+                node_names,
+                limit=max_results,
             )
             if search_query
             else []

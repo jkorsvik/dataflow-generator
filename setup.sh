@@ -1,4 +1,23 @@
 #!/bin/bash
+# Check for fd or fdfind and recommend installation if missing
+
+if ! command -v fd >/dev/null 2>&1 && ! command -v fdfind >/dev/null 2>&1; then
+  echo ""
+  echo "Optional: For much faster file search, install 'fd' (https://github.com/sharkdp/fd):"
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    echo "  brew install fd"
+  elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    echo "  sudo apt install fd-find"
+    echo "  (You may need to use 'fdfind' instead of 'fd')"
+  elif [[ "$OSTYPE" == "msys"* ]] || [[ "$OSTYPE" == "cygwin"* ]]; then
+    echo "  choco install fd"
+  else
+    echo "  See https://github.com/sharkdp/fd for installation instructions."
+  fi
+  echo ""
+fi
+
+
 
 # For Linux, create venv and install uv via pip
 if [[ "$(uname)" == "Linux" ]]; then
