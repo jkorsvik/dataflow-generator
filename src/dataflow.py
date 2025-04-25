@@ -158,10 +158,10 @@ def normalize_path_for_platform(path_str: str) -> str:
     # Handle Windows-specific path normalization
     if os.name == "nt":
         # Convert forward slashes to backslashes for Windows
-        norm_path = norm_path.replace("/", "\\")
+        norm_path = norm_path.replace(r"/", "\\")
 
         # Handle escaped spaces in Windows paths
-        norm_path = norm_path.replace("\ ", " ")
+        norm_path = norm_path.replace(r"\ ", " ")
     else:
         # For Unix-like systems, ensure proper escaping if needed
         if (
