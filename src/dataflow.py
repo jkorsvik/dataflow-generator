@@ -89,7 +89,7 @@ def clear_screen():
     """
     Clears the terminal screen.
     """
-    os.system("cls" if os.name == "nt" else "clear")
+    #os.system("cls" if os.name == "nt" else "clear")
 
 
 def is_sql_file(file_path: str) -> bool:
