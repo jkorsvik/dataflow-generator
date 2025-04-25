@@ -14,9 +14,8 @@ This tool generates visual representations of data flows based on Denodo metadat
 ### Demonstration of the tool's capabilities 
 [![Data Flow Generator Demo](https://github.com/jkorsvik/media_repo/raw/main/data-flow-generator/data-flow-generator-demo-thumbnail.png)](https://github.com/jkorsvik/media_repo/raw/main/data-flow-generator/data-flow-generator-demo.mp4)
 
-<video src="https://github.com/jkorsvik/media_repo/raw/main/data-flow-generator/data-flow-generator-demo.mp4" controls width="640" poster="https://github.com/jkorsvik/media_repo/raw/main/data-flow-generator/data-flow-generator-demo-thumbnail.png">
-  Your browser does not support the video tag.
-</video>
+> **Note:** GitHub READMEs do not support embedded video playback.  
+> Click the image above to view the demo video.
 
 ## Installation
 
