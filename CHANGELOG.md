@@ -1,4 +1,8 @@
 ## Changelog
+### 0.2.1 (2025-05-06)
+- Added MVP PostgreSQL parser for initial SQL dump support
+- Added option to omit edits from console output (enables integration with web/desktop app, "dataflow-app")
+
 
 ### 0.2.0 (2025-04-25)
 - Added automatic detection and optional installation of `fd`/`fdfind` for fast file search
