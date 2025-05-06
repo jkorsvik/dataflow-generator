@@ -387,54 +387,20 @@ div.vis-tooltip b {
     color: #111;
 }
 
-div.vis-tooltip pre {
-    font-size: 11px;
-    background-color: #fff;
-    border: 1px solid #ccc;
-    padding: 8px;
-    border-radius: 4px;
-    max-height: 200px;
-    overflow-y: auto;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    max-height: 50vh;
-    /* Add a maximum height */
-    overflow-y: auto;
+/* MODIFIED: Styles for <pre> elements within tooltips, to be Prism.js friendly */
+div.vis-tooltip pre,
+div.popup pre {
+    font-size: 11px; /* You can adjust this if needed */
+    /* background-color is removed to allow Prism theme's background to apply */
+    border: 1px solid #ccc; /* This provides a fallback border; Prism themes might also add one */
+    padding: 0; /* Let Prism theme (e.g., padding: 1em on pre) handle internal padding */
+    margin: 0; /* Reset margin for pre */
+    border-radius: 4px; /* Consistent with tooltip container */
+    max-height: 400px; /* Max height for the pre block itself */
+    overflow-y: auto; /* Scroll pre block if content exceeds max-height */
+    white-space: pre-wrap; /* Essential for preformatted text */
+    word-wrap: break-word; /* Break long words */
 }
-
-
-.sql-comment {
-    color: #6a737d;
-    font-style: italic;
-}
-
-/* GitHub-like comment color */
-.sql-string {
-    color: #032f62;
-}
-
-/* GitHub-like string color */
-.sql-keyword {
-    color: #d73a49;
-    font-weight: bold;
-}
-
-/* GitHub-like keyword color */
-.sql-function {
-    color: #6f42c1;
-}
-
-/* GitHub-like function color */
-.sql-number {
-    color: #005cc5;
-}
-
-/* GitHub-like number color */
-.sql-operator {
-    color: #d73a49;
-}
-
-/* GitHub-like operator color (can be same as keyword or different) */
 
 #loadingOverlay {
     position: fixed;

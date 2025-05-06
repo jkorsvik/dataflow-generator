@@ -8,7 +8,7 @@ import json
 import textwrap
 import math  # For ceiling function
 import webbrowser
-
+import html # Added for HTML escaping
 
 
 def create_pyvis_figure(
@@ -84,14 +84,12 @@ def create_pyvis_figure(
         node_definition = node_info.get("definition")
         definition_html = ""
         if node_definition:
-            # Use the highlight_sql function from this module
-            
-            # DO NOT escape, allow HTML rendering
+            escaped_node_definition = html.escape(node_definition)
             definition_html = (
                 f"<div style='margin-top:10px;'><b>Definition:</b>"
-                f"<div style='max-height:200px; overflow-y:auto; border:1px solid #eee; padding:5px; background:#f9f9f9; border-radius:4px;'>"
-                f'<pre><code class="language-sql">{node_definition}</code></pre>'
-                f"</div></div>"
+                # The <pre> tag will now be styled by pyvis_styles.css to handle scrolling, padding, background (from Prism theme) etc.
+                f'<pre class="language-sql"><code class="language-sql">{escaped_node_definition}</code></pre>'
+                f"</div>"
             )
 
         hover_text = (
@@ -655,21 +653,76 @@ def inject_html_doctype(html_content: str) -> str:
 
 
 def inject_sql_code_highlighting(html_content: str) -> str:
-    head = """
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css">
-       
-    """
-    body = """
-     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    """Injects Prism.js CSS in <head> and JS before </body> for SQL code highlighting,
+    and adds a trigger to highlight code in dynamic tooltips."""
+    prism_css = (
+        '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">\n'
+    )
+    prism_js_core = '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>\n'
+    prism_js_sql = '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>\n'
+    
+    prism_js_trigger = (
+        "<script>\n"
+        "  document.addEventListener('DOMContentLoaded', function () {\n"
+        "    if (!window.Prism) {\n"
+        "      console.error('Dataflow Generator: Prism.js core not loaded.');\n"
+        "      return;\n"
+        "    }\n"
+        "    if (!Prism.languages.sql) {\n"
+        "      console.error('Dataflow Generator: Prism.js SQL language component not loaded.');\n"
+        "      return;\n"
+        "    }\n"
+        "    if (window.network && typeof network.on === 'function') {\n"
+        "      network.on('showPopup', function(popupId) {\n"
+        "        console.log('Dataflow Generator: showPopup event for ID:', popupId);\n"
+        "        setTimeout(function() {\n"
+        "          var popupElement = document.getElementById(popupId);\n"
+        "          if (popupElement) {\n"
+        "            console.log('Dataflow Generator: Popup element found:', popupElement);\n"
+        "            var codeElements = popupElement.querySelectorAll('code.language-sql');\n"
+        "            if (codeElements.length === 0) {\n"
+        "              console.warn('Dataflow Generator: No elements matching \\'code.language-sql\\' found in popup.');\n"
+        "            } else {\n"
+        "              console.log('Dataflow Generator: Found', codeElements.length, 'SQL code elements to highlight.');\n"
+        "            }\n"
+        "            codeElements.forEach(function(codeElement, index) {\n"
+        "              console.log('Dataflow Generator: Highlighting code element #'+index, codeElement);\n"
+        "              try {\n"
+        "                Prism.highlightElement(codeElement);\n"
+        "                console.log('Dataflow Generator: Successfully called Prism.highlightElement for #'+index);\n"
+        "              } catch (e) {\n"
+        "                console.error('Dataflow Generator: Error calling Prism.highlightElement for #'+index, e);\n"
+        "              }\n"
+        "            });\n"
+        "          } else {\n"
+        "            console.warn('Dataflow Generator: Popup element with ID ' + popupId + ' not found after timeout.');\n"
+        "          }\n"
+        "        }, 100);\n" # Increased timeout
+        "      });\n"
+        "      console.log('Dataflow Generator: Prism tooltip highlighting hook is set up.');\n"
+        "    } else {\n"
+        "      console.warn('Dataflow Generator: Vis Network object not ready for tooltip highlighting hook, or Prism not fully loaded.');\n"
+        "    }\n"
+        "  });\n"
+        "</script>\n"
+    )
 
-        <!-- and it's easy to individually load additional languages -->
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+    # Inject CSS in <head>
+    if '</head>' in html_content:
+        html_content = html_content.replace('</head>', prism_css + '</head>', 1)
+    elif '<meta charset="utf-8">' in html_content: # Fallback if </head> is not present but meta charset is
+        html_content = html_content.replace('<meta charset="utf-8">', '<meta charset="utf-8">\n' + prism_css, 1)
+    else: # Fallback: prepend to content
+        html_content = prism_css + html_content
 
-        <script>hljs.highlightAll();</script>
-    """
-
-    return html_content.replace('<meta charset="utf-8">', '<meta charset="utf-8">\n' + head , 1)
-
+    # Inject JS (core, sql component, and trigger script) before </body>
+    all_prism_js = prism_js_core + prism_js_sql + prism_js_trigger
+    if '</body>' in html_content:
+        html_content = html_content.replace('</body>', all_prism_js + '</body>', 1)
+    else: # Fallback: append to content
+        html_content = html_content + all_prism_js
+        
+    return html_content
 
 
 def draw_pyvis_html(
