@@ -359,9 +359,73 @@ div.vis-tooltip {
     font-size: 13px;
     line-height: 1.4;
     max-height: 50vh;
-    /* Add a maximum height */
     overflow-y: auto;
-    /* Enable vertical scrolling if needed */
+}
+
+/* Custom persistent tooltip */
+.custom-persistent-tooltip {
+    display: flex;
+    flex-direction: column;
+    font-family: Arial, sans-serif;
+    position: fixed;
+    white-space: normal;
+    padding: 0;
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    border-radius: 6px;
+    min-width: 300px;
+    max-width: 60vw;
+    min-height: 200px;
+    max-height: 80vh;
+    color: #333;
+    font-size: 13px;
+    line-height: 1.4;
+    overflow: hidden;
+    resize: both;
+    z-index: 1000;
+}
+
+/* Tooltip header for dragging */
+.custom-persistent-tooltip-header {
+    padding: 8px 12px;
+    background-color: #f0f0f0;
+    border-bottom: 1px solid #ddd;
+    cursor: move;
+    user-select: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 6px 6px 0 0;
+}
+
+.custom-persistent-tooltip-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #444;
+}
+
+.custom-persistent-tooltip-close {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    padding: 4px 8px;
+    font-size: 16px;
+    border-radius: 4px;
+}
+
+.custom-persistent-tooltip-close:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: #333;
+}
+
+/* Content container with scrolling */
+.custom-persistent-tooltip-content {
+    padding: 12px;
+    overflow: auto;
+    max-height: calc(80vh - 37px);
 }
 
 /* Card-style tooltip for node info and definition */

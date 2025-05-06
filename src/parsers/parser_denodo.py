@@ -5,6 +5,7 @@ from typing import List, Tuple, Dict, TypedDict, Union, Set, Any, Optional  # no
 
 from ..dataflow_structs import NodeInfo
 from ..exceptions import InvalidSQLError
+import sqlparse  # type: ignore[import]
 
 SCALING_CONSTANT: float = 2
 SQL_PATTERNS = [
@@ -379,6 +380,14 @@ def parse_dump(
         as_match = re.search(r"\bAS\b", clean_stmt, re.IGNORECASE)
         if as_match:
             definition_part = clean_stmt[as_match.end() :].strip()
+
+            # Pre-process Denodo-specific prefixes like "SQL UNION ALL"
+            definition_part = re.sub(
+                r'\bSQL\s+(SELECT|FROM|WHERE|JOIN|UNION|ALL|GROUP|ORDER|BY|HAVING|AS)\b',
+                r'\1',
+                definition_part,
+                flags=re.IGNORECASE,
+            )
         elif target_type == "table":
             query_pattern = re.compile(
                 r"DATA_LOAD_QUERY\s?=\s?'((?:[^']|'')*)'",

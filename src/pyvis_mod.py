@@ -722,6 +722,13 @@ def inject_sql_code_highlighting(html_content: str) -> str:
     else: # Fallback: append to content
         html_content = html_content + all_prism_js
         
+    # Add fallback Prism highlight hook for dynamic popups
+    fallback_script = '<script>if(window.network && window.Prism){network.on("showPopup",function(){Prism.highlightAll();});}</script>'
+    if '</body>' in html_content:
+        html_content = html_content.replace('</body>', fallback_script + '</body>', 1)
+    else:
+        html_content = html_content + fallback_script
+        
     return html_content
 
 

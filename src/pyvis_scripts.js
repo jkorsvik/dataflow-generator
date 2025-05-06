@@ -1515,20 +1515,57 @@ window.addEventListener("resize", () => {
   }, 250);
 });
 
+function makeDraggable(el) {
+  let isDragging = false, offsetX = 0, offsetY = 0;
+  const header = el.querySelector('.custom-persistent-tooltip-header');
+  if (!header) return;
+  header.style.cursor = 'move';
+  header.addEventListener('mousedown', (e) => {
+    // Begin drag: prevent tooltip clicks from propagating and block text selection
+    e.stopPropagation();
+    e.preventDefault();
+    isDragging = true;
+    offsetX = e.clientX - el.offsetLeft;
+    offsetY = e.clientY - el.offsetTop;
+    document.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  });
+  function onMouseMove(e) {
+    if (!isDragging) return;
+    el.style.left = `${e.clientX - offsetX}px`;
+    el.style.top = `${e.clientY - offsetY}px`;
+  }
+  function onMouseUp() {
+    isDragging = false;
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+  }
+}
+
 // --- Custom Persistent Tooltip Logic ---
 let persistentTooltip = null;
 let persistentTooltipNodeId = null;
 function showPersistentTooltip(nodeId, html, event) {
   hidePersistentTooltip();
   persistentTooltip = document.createElement("div");
-  persistentTooltip.className = "vis-tooltip";
+  persistentTooltip.className = "custom-persistent-tooltip";
   persistentTooltip.innerHTML =
-    `<button style='float:right; margin-left:10px;' onclick='hidePersistentTooltip()'>&#10005;</button>` +
-    html;
+    `<div class="custom-persistent-tooltip-header"><h3>${nodeId}</h3><button class="custom-persistent-tooltip-close" title="Close">&times;</button></div>` +
+    `<div class="custom-persistent-tooltip-content">${html}</div>`;
+  // Close button handler
+  persistentTooltip.querySelector('.custom-persistent-tooltip-close')
+    .addEventListener('click', hidePersistentTooltip);
+  // Prism.js highlighting
+  if (window.Prism) Prism.highlightAllUnder(persistentTooltip);
+  // Make draggable
+  makeDraggable(persistentTooltip);
   persistentTooltip.style.position = "fixed";
   persistentTooltip.style.zIndex = 2000;
   persistentTooltip.style.pointerEvents = "auto";
-  persistentTooltip.style.maxWidth = "450px";
+  persistentTooltip.style.maxWidth = "60vw";
   persistentTooltip.style.maxHeight = "60vh";
   persistentTooltip.style.overflowY = "auto";
   // Position near mouse, but keep in viewport
@@ -1541,8 +1578,7 @@ function showPersistentTooltip(nodeId, html, event) {
   document.body.appendChild(persistentTooltip);
   persistentTooltipNodeId = nodeId;
   // Prevent click from propagating to network
-  persistentTooltip.addEventListener("mousedown", (e) => e.stopPropagation());
-  persistentTooltip.addEventListener("mouseup", (e) => e.stopPropagation());
+  // Removed stopPropagation to ensure document-level mouseup is captured for drag end
 }
 function hidePersistentTooltip() {
   if (persistentTooltip) {
