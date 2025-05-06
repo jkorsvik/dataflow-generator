@@ -79,19 +79,32 @@ def create_pyvis_figure(
             parents = sorted(list(graph.predecessors(node)))
             children = sorted(list(graph.successors(node)))
 
-        # Create hover text (tooltip)
+        # Create hover text (tooltip) with definition as a styled card
+        node_definition = node_info.get("definition")
+        definition_html = ""
+        if node_definition:
+            import html
+            escaped_definition = html.escape(node_definition)
+            definition_html = (
+                f"<div style='margin-top:10px;'><b>Definition:</b>"
+                f"<div style='max-height:200px; overflow-y:auto; border:1px solid #eee; padding:5px; background:#f9f9f9; border-radius:4px;'>"
+                f"<pre style='margin:0; white-space:pre-wrap; word-wrap:break-word; font-size:11px;'>{escaped_definition}</pre>"
+                f"</div></div>"
+            )
+
         hover_text = (
-            f"{node_info['full_name']}\n"
-            f"--------------------\n"
-            f"Type: {node_type}\n"
-            f"Database: {node_info['database'] or '(default)'}\n"
-            f"Connections: {node_degree}\n"
-            f"--------------------\n"
-            f"Parents ({len(parents)}):\n"
-            + ("\n".join(f"  • {p}" for p in parents) if parents else "  (None)")
-            + "\n\n"
-            + f"Children ({len(children)}):\n"
-            + ("\n".join(f"  • {c}" for c in children) if children else "  (None)")
+            f"<b>{node_info['full_name']}</b><br>"
+            f"--------------------<br>"
+            f"Type: {node_type}<br>"
+            f"Database: {node_info['database'] or '(default)'}<br>"
+            f"Connections: {node_degree}<br>"
+            f"--------------------<br>"
+            f"<b>Parents ({len(parents)}):</b><br>"
+            + ("<br>".join(f"  • {p}" for p in parents) if parents else "  (None)")
+            + "<br><br>"
+            + f"<b>Children ({len(children)}):</b><br>"
+            + ("<br>".join(f"  • {c}" for c in children) if children else "  (None)")
+            + (definition_html if node_definition else "")
         )
 
         # Add node to pyvis network
@@ -259,8 +272,7 @@ def inject_controls_and_styles(
     html_content: str, initial_options: Dict, file_name: str = ""
 ) -> str:
     """Injects custom CSS, HTML for controls/legend, and JavaScript into Pyvis HTML."""
-    min_height = 2000
-    # --- 1. Custom CSS (Same as before, includes loading overlay) ---
+    # --- 1. Custom CSS (includes card-style tooltip and all controls/legend/search styles) ---
     custom_css = textwrap.dedent("""
     <style type="text/css">
         @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css');
@@ -378,7 +390,34 @@ def inject_controls_and_styles(
         .legend-item { display: flex; align-items: center; margin-bottom: 6px; } .legend-item:last-child { margin-bottom: 0; }
         .legend-color { width: 15px; height: 15px; margin-right: 8px; border-radius: 3px; border: 1px solid #ccc; }
         .legend-label { font-size: 13px; color: #555; }
-        div.vis-tooltip { font-family: monospace; white-space: pre-wrap; padding: 8px; background-color: #fff; border: 1px solid #ccc; box-shadow: 2px 2px 6px rgba(0,0,0,0.1); border-radius: 4px; max-width: 350px; color: #333; }
+        /* Card-style tooltip for node info and definition */
+        div.vis-tooltip {
+            font-family: Arial, sans-serif;
+            white-space: normal;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            border-radius: 6px;
+            max-width: 450px;
+            color: #333;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        div.vis-tooltip b {
+            color: #111;
+        }
+        div.vis-tooltip pre {
+            font-size: 11px;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            padding: 8px;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
         #loadingOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(200, 200, 200, 0.6); z-index: 1002; display: none; justify-content: center; align-items: center; font-size: 1.5em; color: #333; text-align: center; }
         #loadingOverlay .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -640,6 +679,7 @@ def inject_controls_and_styles(
             margin: 0 2px;
             font-family: monospace;
         }
+        
     </style>
     """)
 

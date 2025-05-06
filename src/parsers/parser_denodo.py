@@ -134,7 +134,7 @@ def find_script_dependencies(
     return list(dep for dep in final_dependencies if dep)
 
 
-def add_node(full_name: str, node_type: str, is_dependency: bool = False) -> str:
+def add_node(full_name: str, node_type: str, is_dependency: bool = False, definition: Optional[str] = None) -> str:
     """Adds or updates node information, ensuring CTE type priority."""
     if not full_name:
         return ""
@@ -165,11 +165,14 @@ def add_node(full_name: str, node_type: str, is_dependency: bool = False) -> str
     # Add/update node_types
     if base_name not in node_types:
         # New node - Add it directly
-        node_types[base_name] = {
+        node_info_dict = {
             "type": node_type,
             "database": database,
             "full_name": effective_full_name,
         }
+        if definition and not is_dependency:
+            node_info_dict["definition"] = definition
+        node_types[base_name] = node_info_dict
     else:
         # Existing node - Check before updating
         existing_info = node_types[base_name]
@@ -199,6 +202,9 @@ def add_node(full_name: str, node_type: str, is_dependency: bool = False) -> str
                         existing_info["full_name"] == base_name
                     ):  # Update full_name if it was just base
                         existing_info["full_name"] = effective_full_name
+        # Only set definition if not a dependency and not already set
+        if definition and not is_dependency and not existing_info.get("definition"):
+            existing_info["definition"] = definition
 
     return base_name
 
@@ -345,7 +351,7 @@ def parse_dump(
         else:
             continue
 
-        target_base_name = add_node(target_full_name, target_type)
+        target_base_name = add_node(target_full_name, target_type, is_dependency=False, definition=clean_stmt)
         if not target_base_name:
             continue
 
