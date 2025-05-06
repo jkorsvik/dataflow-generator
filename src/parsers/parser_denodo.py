@@ -321,7 +321,7 @@ def parse_dump(
             continue
 
         view_pattern = re.compile(
-            r"CREATE(?: OR REPLACE)?(?:\s+\w+)?\s+VIEW\s+([a-zA-Z0-9_\.]+)",
+            r"CREATE(?: OR REPLACE)?(?:\s+INTERFACE)?\s+VIEW\s+([a-zA-Z0-9_\.]+)",
             re.IGNORECASE | re.DOTALL,
         )
         table_pattern = re.compile(
@@ -349,21 +349,8 @@ def parse_dump(
         if not target_base_name:
             continue
 
-        # --- Extract Definition Part ---
-        definition_part = None
-        as_match = re.search(r"\bAS\b", clean_stmt, re.IGNORECASE)
-        if as_match:
-            definition_part = clean_stmt[as_match.end() :].strip()
-        elif target_type == "table":
-            query_pattern = re.compile(
-                r"DATA_LOAD_QUERY\s?=\s?'((?:[^']|'')*)'",
-                re.IGNORECASE | re.MULTILINE | re.DOTALL,
-            )
-            load_query_match = query_pattern.search(clean_stmt)
-            if load_query_match:
-                definition_part = load_query_match.group(1).replace("''", "'")
-        if not definition_part:
-            # Special handling for INTERFACE VIEW: look for SET IMPLEMENTATION dependency
+        # Always check for SET IMPLEMENTATION for any view
+        if target_type == "view":
             imp_pattern = re.compile(
                 r"SET\s+IMPLEMENTATION\s+([a-zA-Z0-9_\.]+)", re.IGNORECASE | re.MULTILINE
             )
@@ -378,6 +365,21 @@ def parse_dump(
                         edge = (actual_dep_base, target_base_name)
                         if edge not in edges and actual_dep_base != target_base_name:
                             edges.append(edge)
+
+        # --- Extract Definition Part ---
+        definition_part = None
+        as_match = re.search(r"\bAS\b", clean_stmt, re.IGNORECASE)
+        if as_match:
+            definition_part = clean_stmt[as_match.end() :].strip()
+        elif target_type == "table":
+            query_pattern = re.compile(
+                r"DATA_LOAD_QUERY\s?=\s?'((?:[^']|'')*)'",
+                re.IGNORECASE | re.MULTILINE | re.DOTALL,
+            )
+            load_query_match = query_pattern.search(clean_stmt)
+            if load_query_match:
+                definition_part = load_query_match.group(1).replace("''", "'")
+        if not definition_part:
             continue
         # --- End Extract Definition Part ---
 
