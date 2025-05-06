@@ -21,7 +21,7 @@ import sys, webbrowser
 import time
 from pathlib import Path
 from rapidfuzz import process
-from typing import List, Dict, Optional, Set
+from typing import List, Dict, Optional, Set, Tuple
 
 # Constants
 SQL_EXTENSIONS = [
@@ -687,7 +687,7 @@ def search_node(nodes: List[Node]):
         print(instructions)
         print(f"Current search: {search_query}")
 
-        matches = (
+        matches: List[Tuple[str, float, int]] = (
             process.extract(
                 search_query,
                 node_names,

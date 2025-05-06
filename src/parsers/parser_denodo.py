@@ -4,13 +4,11 @@ import re
 from typing import List, Tuple, Dict, TypedDict, Union, Set, Any, Optional  # noqa: F401
 
 from ..dataflow_structs import NodeInfo
+from ..dataflow_structs import SQL_PATTERNS
 from ..exceptions import InvalidSQLError
+import sqlparse  # type: ignore[import]
 
-SCALING_CONSTANT: float = 2
-SQL_PATTERNS = [
-    r"\b(CREATE|SELECT|FROM|JOIN|VIEW|TABLE)\b",
-    r"\b(INSERT|UPDATE|DELETE|DROP|ALTER)\b",
-]
+
 
 # Global variable declarations with updated type annotations
 database_stats: Dict[str, int] = {}
@@ -62,7 +60,7 @@ def find_script_dependencies(
     # Use the tried-and-tested comprehensive pattern for table references
     table_pattern = re.compile(
         r"""
-        \b(?:FROM|JOIN|INTO|IMPLEMENTATION)\s+ # Added INTO/IMPL back if they were there
+        \b(?:FROM(?:\s+FLATTEN)?|JOIN|INTO|IMPLEMENTATION)\s+ # Support FROM FLATTEN
         (?:')?                    # Optional opening quote
         (?!\s*SELECT\b|\s*WITH\b|\s*VALUES\b|\s*LATERAL\b|\s*UNNEST\b|\s*TABLE\b|\() # Negative lookahead
         \s*
@@ -134,7 +132,7 @@ def find_script_dependencies(
     return list(dep for dep in final_dependencies if dep)
 
 
-def add_node(full_name: str, node_type: str, is_dependency: bool = False) -> str:
+def add_node(full_name: str, node_type: str, is_dependency: bool = False, definition: Optional[str] = None) -> str:
     """Adds or updates node information, ensuring CTE type priority."""
     if not full_name:
         return ""
@@ -165,11 +163,16 @@ def add_node(full_name: str, node_type: str, is_dependency: bool = False) -> str
     # Add/update node_types
     if base_name not in node_types:
         # New node - Add it directly
-        node_types[base_name] = {
+        # Initialize with all required keys for NodeInfo, definition can be None
+        node_info_dict: NodeInfo = {
             "type": node_type,
             "database": database,
             "full_name": effective_full_name,
+            "definition": None,
         }
+        if definition and not is_dependency:
+            node_info_dict["definition"] = definition
+        node_types[base_name] = node_info_dict
     else:
         # Existing node - Check before updating
         existing_info = node_types[base_name]
@@ -199,6 +202,9 @@ def add_node(full_name: str, node_type: str, is_dependency: bool = False) -> str
                         existing_info["full_name"] == base_name
                     ):  # Update full_name if it was just base
                         existing_info["full_name"] = effective_full_name
+        # Only set definition if not a dependency and not already set
+        if definition and not is_dependency and not existing_info.get("definition"):
+            existing_info["definition"] = definition
 
     return base_name
 
@@ -310,7 +316,7 @@ def parse_dump(
         if not re.match(r"^\s*CREATE", raw_stmt, re.IGNORECASE):
             continue
 
-        comment_pattern = r"(--.*?$|/\*.*?\*/)"
+        comment_pattern = r"(--.*?$|/\*.*?\*/|#.*?$)"
         clean_stmt = re.sub(
             comment_pattern,
             "",
@@ -321,7 +327,7 @@ def parse_dump(
             continue
 
         view_pattern = re.compile(
-            r"CREATE(?: OR REPLACE)?(?:\s+\w+)?\s+VIEW\s+([a-zA-Z0-9_\.]+)",
+            r"CREATE(?: OR REPLACE)?(?:\s+INTERFACE)?\s+VIEW\s+([a-zA-Z0-9_\.]+)",
             re.IGNORECASE | re.DOTALL,
         )
         table_pattern = re.compile(
@@ -345,15 +351,40 @@ def parse_dump(
         else:
             continue
 
-        target_base_name = add_node(target_full_name, target_type)
+        target_base_name = add_node(target_full_name, target_type, is_dependency=False, definition=clean_stmt)
         if not target_base_name:
             continue
+
+        # Always check for SET IMPLEMENTATION for any view
+        if target_type == "view":
+            imp_pattern = re.compile(
+                r"SET\s+IMPLEMENTATION\s+([a-zA-Z0-9_\.]+)", re.IGNORECASE | re.MULTILINE
+            )
+            imp_match = imp_pattern.search(clean_stmt)
+            if imp_match:
+                implementation_name = imp_match.group(1).strip()
+                if implementation_name:
+                    actual_dep_base = add_node(
+                        implementation_name, guess_type(implementation_name), is_dependency=True
+                    )
+                    if actual_dep_base:
+                        edge = (actual_dep_base, target_base_name)
+                        if edge not in edges and actual_dep_base != target_base_name:
+                            edges.append(edge)
 
         # --- Extract Definition Part ---
         definition_part = None
         as_match = re.search(r"\bAS\b", clean_stmt, re.IGNORECASE)
         if as_match:
             definition_part = clean_stmt[as_match.end() :].strip()
+
+            # Pre-process Denodo-specific prefixes like "SQL UNION ALL"
+            definition_part = re.sub(
+                r'\bSQL\s+(SELECT|FROM|WHERE|JOIN|UNION|ALL|GROUP|ORDER|BY|HAVING|AS)\b',
+                r'\1',
+                definition_part,
+                flags=re.IGNORECASE,
+            )
         elif target_type == "table":
             query_pattern = re.compile(
                 r"DATA_LOAD_QUERY\s?=\s?'((?:[^']|'')*)'",

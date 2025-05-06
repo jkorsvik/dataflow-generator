@@ -1,376 +1,375 @@
-# mypy: ignore-errors
-
+import json
 import os
-import logging
-from typing import List, Tuple, Dict, Set, Optional, Union
-from sqlfluff.core import Linter, SQLLintError
-from sqlfluff.core.parser.segments.base import BaseSegment
+import re
+from typing import Dict, List, Tuple, Optional, Union
 
-from ..dataflow_structs import NodeInfo
-from ..exceptions import InvalidSQLError
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-logger = logging.getLogger(__name__)
+# import sqlglot  (unused)
+import sqlfluff
+from sqlglot import parse, exp
 
 
-# --- Helper Function to manage nodes (similar to denodo parser's add_node) ---
-def _add_node(
-    nodes: Dict[str, NodeInfo],
-    full_name: str,
+from ..dataflow_structs import NodeInfo as NodeInfo, InvalidSQLError
+
+
+class NodeInfoPG(NodeInfo, total=False):
+    constraints: List[str]  # For potential future use, not heavily used in current code
+    definition_parts: List[str]  # Internal list to accumulate DDL segments
+
+SQL_PATTERNS = [
+    r"CREATE\s+TABLE", r"ALTER\s+TABLE", r"CREATE\s+VIEW",
+    r"CREATE\s+MATERIALIZED\s+VIEW", r"CREATE\s+FUNCTION",
+    r"CREATE\s+PROCEDURE", r"CREATE\s+TYPE", r"CREATE\s+DOMAIN",
+    r"CREATE\s+SEQUENCE",
+] # Basic patterns to check if content is SQL DDL
+
+
+def _extract_schema(schema_expr: Optional[exp.Expression]) -> Optional[str]:
+    """Extracts schema name from a schema expression node (Identifier)."""
+    if isinstance(schema_expr, exp.Identifier):
+        return schema_expr.name
+    return None
+
+
+def format_sql(definition: str) -> str:
+    """Pretty-format SQL definition using sqlfluff if available, else sqlglot."""
+    try:
+        # Use sqlfluff to lint and fix the SQL for formatting
+        formatted = sqlfluff.fix(definition, dialect='postgres')
+        if formatted and formatted.strip():
+            return formatted.strip()
+    except Exception:
+        pass  # Fallback to sqlglot if sqlfluff is not available or fails
+
+   
+    # Fallback to simple strip if formatting fails for any reason
+    return definition.strip()
+
+
+def add_node(
+    name: str,
     node_type: str,
-    db_objects: Dict[str, Set[str]],  # Simplified: Just track objects per DB
-    is_dependency: bool = False,
-) -> Optional[str]:
-    """Adds or updates node information, prioritizing CTEs. Returns base_name or None."""
-    if not full_name:
-        return None
+    schema: Optional[str],
+    definition: Optional[str], # SQL text of the statement being processed
+    node_types: Dict[str, NodeInfoPG],
+) -> str:
+    """
+    Adds or updates a node in the node_types dictionary.
+    Nodes are keyed by their full name (e.g., "schema.name").
+    This function accumulates definitions (e.g., from CREATE and subsequent ALTER statements).
+    Definitions are pretty-formatted.
+    Returns the full_name key of the node.
+    """
+    if not name: # Skip if name is somehow empty
+        # This case should ideally be prevented by callers or parser.
+        # Consider logging a warning if this happens.
+        return "" 
+        
+    full_name = f"{schema + '.' if schema else ''}{name}"
+    
+    # Retrieve existing node info or initialize a new one if it's the first time seeing this node.
+    # Type casting to NodeInfoPG for type checker, assuming dict matches NodeInfoPG structure.
+    existing_info = node_types.get(full_name)
+    # Initialize or reuse a single info dict, including DDL parts and initial definition
+    info: NodeInfoPG = existing_info if existing_info else {
+        "constraints": [],
+        "definition_parts": [],
+        "type": node_type,
+        "database": schema or "",
+        "full_name": full_name,
+        "definition": None
+    }  # type: ignore
 
-    parts = full_name.split(".")
-    base_name = parts[-1].strip('"')  # Handle quoted identifiers
+    # Append the new DDL segment
+    if definition:
+        formatted_part = format_sql(definition)
+        info["definition_parts"].append(formatted_part)
+        info["definition"] = "\n\n-- Additional DDL --\n".join(info["definition_parts"])
 
-    is_new_type_cte = node_type == "cte_view"
-    database = None
-    if len(parts) > 1 and not is_new_type_cte:
-        # Potentially schema.table or db.schema.table - take first part as potential DB/Schema
-        database = parts[0].strip('"')
-    elif len(parts) == 1 and not is_new_type_cte:
-        # Could be a table in the default search path, no explicit DB/Schema
-        database = None  # Represent default/unknown schema
-
-    effective_full_name = base_name if is_new_type_cte else full_name
-
-    # Track objects per database/schema (optional, for stats)
-    if database and not is_new_type_cte:
-        db_objects.setdefault(database, set())
-        db_objects[database].add(base_name)
-
-    if base_name not in nodes:
-        nodes[base_name] = {
-            "type": node_type,
-            "database": database or "",  # Store empty string if no DB/Schema found
-            "full_name": effective_full_name,
-        }
-    else:
-        existing_info = nodes[base_name]
-        current_type = existing_info["type"]
-        if current_type == "cte_view":
-            pass  # CTE type is final
-        elif is_new_type_cte:
-            existing_info["type"] = "cte_view"
-            existing_info["database"] = ""
-            existing_info["full_name"] = base_name
-        else:
-            # Simple priority: view > table > unknown
-            type_priority = {
-                "unknown": 0,
-                "table": 1,
-                "materialized_view": 2,
-                "view": 3,
-            }
-            new_prio = type_priority.get(node_type, 0)
-            curr_prio = type_priority.get(current_type, 0)
-            if new_prio >= curr_prio:
-                existing_info["type"] = node_type
-                # Update database only if new one is found and current is empty
-                if not existing_info["database"] and database:
-                    existing_info["database"] = database
-                    if existing_info["full_name"] == base_name:
-                        existing_info["full_name"] = effective_full_name
-
-    return base_name
+    node_types[full_name] = info
+    return full_name
 
 
-# --- Core Parsing Logic ---
+def find_dependencies(query_expr: exp.Expression) -> List[Tuple[str, Optional[str]]]:
+    """
+    Finds all table/view dependencies within a given SQL query expression.
+    Useful for identifying source tables for views, CTAS, or CTEs.
+    Returns a list of (table_name, schema_name) tuples.
+    """
+    deps: List[Tuple[str, Optional[str]]] = []
+    # find_all(exp.Table) gets all table objects mentioned in the expression.
+    for tbl_expr in query_expr.find_all(exp.Table):
+        table_name = tbl_expr.name
+        # Schema can be in 'db' (most common) or 'catalog' part of the table expression.
+        schema_name = _extract_schema(tbl_expr.args.get("db") or tbl_expr.args.get("catalog"))
+        if table_name: # Ensure a table name was actually found.
+            deps.append((table_name, schema_name))
+    return deps
 
 
-def _find_dependencies(segment: BaseSegment, defined_ctes: Set[str]) -> Set[str]:
-    """Recursively finds table/view/CTE references within a segment."""
-    dependencies = set()
-    # Look for table references specifically
-    for sub_segment in segment.recursive_crawl("table_reference"):
-        # Sometimes the reference is nested, crawl deeper if needed
-        ref_name_segment = next(sub_segment.recursive_crawl("object_reference"), None)
-        if ref_name_segment:
-            raw_name = ref_name_segment.raw.strip('"')
-            # Check if it's one of the CTEs defined in the current scope
-            base_name = raw_name.split(".")[-1]
-            if base_name not in defined_ctes:
-                dependencies.add(
-                    raw_name
-                )  # Add the full reference (e.g., schema.table)
+def find_foreign_keys(statement_expr: Union[exp.Create, exp.Alter]) -> List[Tuple[str, str]]:
+    """
+    Extracts foreign key references from a CREATE or ALTER statement.
+    Returns a list of (local_table_full_name, referenced_table_full_name) tuples.
+    This represents an edge: local_table_full_name -> referenced_table_full_name.
+    """
+    fks: List[Tuple[str, str]] = []
+    # Iterate over all ForeignKey expressions within the given statement.
+    for fk_constraint_expr in statement_expr.find_all(exp.ForeignKey):
+        # The ForeignKey constraint is part of a larger statement (CREATE/ALTER).
+        # We need to identify the table this statement applies to (the local table).
+        
+        # `statement_expr.this` should point to the table being created or altered.
+        if not isinstance(statement_expr.this, exp.Table):
+            continue # Should be a table for FKs.
 
-    # Also consider CTE references directly (might not be inside table_reference)
-    for cte_ref_segment in segment.recursive_crawl(
-        "common_table_expression_identifier"
-    ):
-        raw_name = cte_ref_segment.raw.strip('"')
-        # We only care about references *to* CTEs defined *elsewhere* or in this scope
-        # The logic processing the statement needs to handle linking *within* the scope
-        # This function mainly finds external table/view deps or cross-CTE deps if structure allows
-        # Let's assume for now this finds references to CTEs defined in the *current* WITH clause
-        # This might need refinement based on how sqlfluff structures nested WITHs.
-        dependencies.add(raw_name)  # Add CTE name
+        local_table_obj = statement_expr.this
+        local_table_name = local_table_obj.name
+        local_schema_name = _extract_schema(local_table_obj.args.get("db") or local_table_obj.args.get("catalog"))
+        local_full_name = f"{local_schema_name + '.' if local_schema_name else ''}{local_table_name}"
 
-    return dependencies
+        # The 'reference' (or 'references') arg in ForeignKey points to the referenced table.
+        referenced_table_expr = fk_constraint_expr.args.get('reference') or fk_constraint_expr.args.get('references')
+        if isinstance(referenced_table_expr, exp.Table):
+            ref_table_name = referenced_table_expr.name
+            ref_schema_name = _extract_schema(referenced_table_expr.args.get("db") or referenced_table_expr.args.get("catalog"))
+            ref_full_name = f"{ref_schema_name + '.' if ref_schema_name else ''}{ref_table_name}"
+            
+            if local_full_name and ref_full_name: # Ensure both names are valid
+                 fks.append((local_full_name, ref_full_name))
+            
+    return fks
 
 
 def parse_dump(
-    file_path: Union[str, os.PathLike],
-) -> Tuple[List[Tuple[str, str]], Dict[str, NodeInfo], Dict[str, int]]:
-    """Parses a PostgreSQL SQL dump file using sqlfluff to extract structure."""
-    logger.info(f"Starting PostgreSQL parsing for: {file_path}")
-    try:
-        with open(file_path, "r", encoding="utf-8") as file:
-            content = file.read()
-    except (FileNotFoundError, OSError, TypeError):
-        if isinstance(file_path, str):
-            content = file_path  # Treat as content if not a valid path
-        else:
-            raise ValueError("Invalid input: must be a file path or a string.")
-
-    if not content:
-        raise InvalidSQLError("SQL content is empty.")
-
-    # Initialize results
-    edges: List[Tuple[str, str]] = []
-    node_types: Dict[str, NodeInfo] = {}
-    db_objects: Dict[str, Set[str]] = {}  # Simplified tracking for stats
-    edge_set: Set[Tuple[str, str]] = set()  # To avoid duplicate edges
-
-    # Use sqlfluff linter to get the parsed tree
-    linter = Linter(dialect="postgres")
-    try:
-        linted_path = linter.lint_string(content)
-        parsed_tree = linted_path.tree
-        if not parsed_tree:
-            raise InvalidSQLError("SQLFluff could not parse the file.")
-    except SQLLintError as e:
-        logger.error(f"SQLFluff parsing error: {e}")
-        # Depending on severity, you might want to raise or just log
-        raise InvalidSQLError(f"SQLFluff parsing failed: {e}") from e
-    except Exception as e:  # Catch broader exceptions during linting
-        logger.error(f"Unexpected error during SQLFluff linting: {e}")
-        raise InvalidSQLError(f"Unexpected SQLFluff error: {e}") from e
-
-    # --- Process statements ---
-    statements = parsed_tree.recursive_crawl("statement")
-    for stmt in statements:
-        defined_ctes: Set[str] = set()
-        current_target_name: Optional[str] = None
-        current_target_type: Optional[str] = None
-
-        # 1. Handle WITH clauses (CTEs) first
-        with_clause = next(stmt.recursive_crawl("with_compound_statement"), None)
-        if with_clause:
-            for cte_segment in with_clause.recursive_crawl("common_table_expression"):
-                cte_name_segment = next(cte_segment.recursive_crawl("identifier"), None)
-                if cte_name_segment:
-                    cte_name = cte_name_segment.raw.strip('"')
-                    defined_ctes.add(cte_name)
-                    # Add CTE node immediately
-                    _add_node(node_types, cte_name, "cte_view", db_objects)
-                    # Find dependencies *within* this CTE body
-                    cte_body = cte_segment  # Assuming the body is within the CTE segment itself
-                    cte_internal_deps = _find_dependencies(cte_body, defined_ctes)
-                    for dep_full_name in cte_internal_deps:
-                        # Ensure dependency node exists (could be another CTE or table/view)
-                        # Guess type if not already known (might be table/view)
-                        dep_base_name = dep_full_name.split(".")[-1].strip('"')
-                        dep_type = node_types.get(dep_base_name, {}).get(
-                            "type", "unknown"
-                        )
-                        if dep_type == "unknown":
-                            # Basic guess if unknown - could be improved
-                            dep_type = (
-                                "view" if "view" in dep_base_name.lower() else "table"
-                            )
-
-                        # Add the dependency node (might update type if guess is better)
-                        dep_node_base = _add_node(
-                            node_types,
-                            dep_full_name,
-                            dep_type,
-                            db_objects,
-                            is_dependency=True,
-                        )
-                        if dep_node_base:
-                            edge = (dep_node_base, cte_name)
-                            if edge not in edge_set and dep_node_base != cte_name:
-                                edges.append(edge)
-                                edge_set.add(edge)
-
-        # 2. Identify the main object being created (Table, View, MView)
-        create_table_segment = next(
-            stmt.recursive_crawl("create_table_statement"), None
-        )
-        create_view_segment = next(stmt.recursive_crawl("create_view_statement"), None)
-        create_mview_segment = next(
-            stmt.recursive_crawl("create_materialized_view_statement"), None
-        )
-
-        target_segment = None
-        if create_table_segment:
-            current_target_type = "table"
-            target_segment = create_table_segment
-        elif create_view_segment:
-            current_target_type = "view"
-            target_segment = create_view_segment
-        elif create_mview_segment:
-            current_target_type = "materialized_view"
-            target_segment = create_mview_segment
-
-        if target_segment and current_target_type:
-            # Find the object reference for the created object
-            obj_ref = next(
-                target_segment.recursive_crawl("object_reference", no_recursive=True),
-                None,
-            )
-            # Sometimes it's nested directly under table_reference or view_reference
-            if not obj_ref:
-                table_ref = next(
-                    target_segment.recursive_crawl(
-                        "table_reference", no_recursive=True
-                    ),
-                    None,
-                )
-                if table_ref:
-                    obj_ref = next(table_ref.recursive_crawl("object_reference"), None)
-            if not obj_ref:
-                view_ref = next(
-                    target_segment.recursive_crawl("view_reference", no_recursive=True),
-                    None,
-                )
-                if view_ref:
-                    obj_ref = next(view_ref.recursive_crawl("object_reference"), None)
-
-            if obj_ref:
-                target_full_name = obj_ref.raw.strip('"')
-                current_target_name = _add_node(
-                    node_types, target_full_name, current_target_type, db_objects
-                )
-
-                # 3. Find dependencies for the main created object
-                if current_target_name:
-                    # Search within the definition part (usually after 'AS')
-                    definition_segment = (
-                        target_segment  # Start search from the create statement itself
-                    )
-                    main_deps = _find_dependencies(definition_segment, defined_ctes)
-                    for dep_full_name in main_deps:
-                        dep_base_name = dep_full_name.split(".")[-1].strip('"')
-                        dep_type = node_types.get(dep_base_name, {}).get(
-                            "type", "unknown"
-                        )
-                        # If the dependency is a CTE defined above, its type is known
-                        if dep_base_name in defined_ctes:
-                            dep_type = "cte_view"
-                        elif dep_type == "unknown":
-                            # Basic guess if unknown
-                            dep_type = (
-                                "view" if "view" in dep_base_name.lower() else "table"
-                            )
-
-                        dep_node_base = _add_node(
-                            node_types,
-                            dep_full_name,
-                            dep_type,
-                            db_objects,
-                            is_dependency=True,
-                        )
-                        if dep_node_base:
-                            edge = (dep_node_base, current_target_name)
-                            if (
-                                edge not in edge_set
-                                and dep_node_base != current_target_name
-                            ):
-                                edges.append(edge)
-                                edge_set.add(edge)
-        # TODO: Handle other statement types like INSERT, UPDATE, DELETE if needed for lineage
-
-    # Calculate database stats (count non-CTE nodes per db/schema)
-    database_stats: Dict[str, int] = {}
-    for node_info in node_types.values():
-        if node_info["type"] != "cte_view" and node_info["database"]:
-            db_name = node_info["database"]
-            database_stats[db_name] = database_stats.get(db_name, 0) + 1
-
-    logger.info(
-        f"PostgreSQL parsing complete. Found {len(node_types)} nodes and {len(edges)} edges."
-    )
-    return edges, node_types, database_stats
-
-
-# Example usage (optional, for testing)
-if __name__ == "__main__":
-    # Create a dummy SQL file for testing
-    dummy_sql = """
-    -- PostgreSQL database dump example
-    CREATE SCHEMA IF NOT EXISTS production;
-
-    CREATE TABLE production.users (
-        user_id SERIAL PRIMARY KEY,
-        username VARCHAR(50) UNIQUE NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE production.orders (
-        order_id SERIAL PRIMARY KEY,
-        user_id INT REFERENCES production.users(user_id),
-        order_date DATE,
-        total_amount DECIMAL(10, 2)
-    );
-
-    CREATE VIEW production.recent_orders_v AS
-    SELECT
-        o.order_id,
-        u.username,
-        o.order_date
-    FROM production.orders o
-    JOIN production.users u ON o.user_id = u.user_id
-    WHERE o.order_date > CURRENT_DATE - INTERVAL '30 days';
-
-    WITH monthly_sales AS (
-        SELECT
-            date_trunc('month', order_date) AS sale_month,
-            sum(total_amount) as monthly_total
-        FROM production.orders
-        GROUP BY 1
-    ),
-    -- Another CTE depending on the first
-    avg_sales AS (
-        SELECT avg(monthly_total) as average_sale FROM monthly_sales
-    )
-    CREATE MATERIALIZED VIEW production.high_value_users_mv AS
-    SELECT u.user_id, u.username
-    FROM production.users u
-    JOIN production.recent_orders_v rov ON u.user_id = (SELECT user_id FROM production.orders WHERE order_id = rov.order_id) -- Example subquery reference
-    JOIN monthly_sales ms ON date_trunc('month', rov.order_date) = ms.sale_month -- Join with CTE
-    WHERE rov.order_id IN (SELECT order_id FROM production.orders WHERE total_amount > (SELECT average_sale FROM avg_sales)) -- Reference another CTE
-    GROUP BY 1, 2
-    HAVING count(rov.order_id) > 5;
-
-    INSERT INTO production.users (username) VALUES ('testuser');
+    file_path_or_sql_string: Union[str, os.PathLike],
+) -> Tuple[List[Tuple[str, str]], Dict[str, NodeInfoPG], Dict[str, int]]:
     """
-    test_file = "./dummy_postgres_dump.sql"
-    with open(test_file, "w", encoding="utf-8") as f:
-        f.write(dummy_sql)
-
+    Parses a SQL dump file (or a string containing SQL) to extract schema information,
+    dependencies (e.g., for views), and foreign keys.
+    """
     try:
-        res_edges, res_nodes, res_stats = parse_dump(test_file)
-        print("\n--- Edges ---")
-        for edge in res_edges:
-            print(edge)
-        print("\n--- Nodes ---")
-        import json
-
-        print(json.dumps(res_nodes, indent=2))
-        print("\n--- Stats ---")
-        print(res_stats)
+        # Check if input is a file path and read it.
+        if isinstance(file_path_or_sql_string, (str, os.PathLike)) and os.path.exists(file_path_or_sql_string):
+             with open(file_path_or_sql_string, "r", encoding="utf-8") as f:
+                content = f.read()
+        # If not an existing path, assume it's an SQL string.
+        elif isinstance(file_path_or_sql_string, str):
+            content = file_path_or_sql_string
+        else:
+            raise ValueError("Invalid input: an existing file path or an SQL string is required.")
     except Exception as e:
-        print(f"Error during test run: {e}")
-    finally:
-        # Clean up the dummy file
-        if os.path.exists(test_file):
-            os.remove(test_file)
-            print(f"\nCleaned up {test_file}")
+        # Catch-all for file reading errors or other initial issues.
+        raise ValueError(f"Error reading input: {e}")
+
+
+    # Pre-processing: Comment out lines that are not DDL for tables/views or are problematic for parsing.
+    # Remove all comments (single-line and block)
+    def _remove_sql_comments(sql: str) -> str:
+        # Remove block comments
+        sql = re.sub(r'/\*.*?\*/', '', sql, flags=re.DOTALL)
+        # Remove single-line comments
+        sql = re.sub(r'--.*?$', '', sql, flags=re.MULTILINE)
+        return sql
+
+    content = _remove_sql_comments(content)
+    
+    lines = content.splitlines()
+    cleaned_lines: List[str] = []
+    in_copy_data_block: bool = False # Flag for being inside a COPY ... FROM STDIN data block.
+    in_ignored_multiline_statement: bool = False # True if inside a multi-line statement to be ignored
+    ignored_statement_type: Optional[str] = None # Stores type like "FUNCTION", "TRIGGER"
+
+    # Regex to detect start of ignored DDL statements that might be multi-line
+    ignored_ddl_start_regex = re.compile(
+        r'^\s*(CREATE|ALTER)\s+(?:OR\s+REPLACE\s+)?(SCHEMA|INDEX|FUNCTION|TRIGGER|PROCEDURE|SEQUENCE)\b',
+        re.IGNORECASE
+    )
+    # Regex for other single-line ignored commands (e.g., \connect, SET var =, SELECT pg_catalog.setval)
+    # pg_dump uses "SET name = value;"
+    other_ignored_line_regex = re.compile(
+        r'^\s*(?:\\connect|\\set|SET\s+[a-zA-Z_][a-zA-Z0-9_]*\s*=|SELECT\s+pg_catalog\.setval)\b',
+        re.IGNORECASE
+    )
+    
+    
+    for line in lines:
+        stripped_line = line.strip()
+        
+        # Handle COPY ... FROM STDIN data blocks
+        if in_copy_data_block:
+            cleaned_lines.append(f"--{line}") # Comment out lines within COPY data
+            if stripped_line == '\\.' or re.match(r'^\\\.', stripped_line): # End of COPY data
+                in_copy_data_block = False
+            continue
+        
+        # Detect start of COPY ... FROM STDIN statement
+        if re.match(r'^\s*COPY\s+.*\s+FROM\s+ST(?:DIN)?', stripped_line, re.IGNORECASE):
+            cleaned_lines.append(f"--{line}") # Comment out the COPY statement itself
+            if not stripped_line.endswith('\\.'): # If data is on subsequent lines
+                in_copy_data_block = True
+            continue
+
+        # Handle lines within an ignored multi-line DDL statement
+        if in_ignored_multiline_statement:
+            cleaned_lines.append(f"--{line}") # Comment out the line
+            
+            terminated = False
+            # Check for termination based on statement type
+            if ignored_statement_type in ("FUNCTION", "PROCEDURE"):
+                # For functions/procedures, termination is typically '$$;'
+                if re.search(r'\$\$\s*;$', stripped_line): # Ends with '$$;' possibly with space
+                    terminated = True
+            elif stripped_line.endswith(';'): # For other types (TRIGGER, SEQUENCE, etc.)
+                terminated = True
+            
+            if terminated:
+                in_ignored_multiline_statement = False
+                ignored_statement_type = None
+            continue
+
+        # Detect start of an ignored DDL statement (CREATE/ALTER FUNCTION, TRIGGER, etc.)
+        match_ignored_ddl = ignored_ddl_start_regex.match(stripped_line)
+        if match_ignored_ddl:
+            cleaned_lines.append(f"--{line}") # Comment out the starting line
+            
+            current_statement_main_type = match_ignored_ddl.group(2).upper() # FUNCTION, TRIGGER, etc.
+
+            # Determine if it's single-line or multi-line
+            is_single_line_terminated = False
+            if current_statement_main_type in ("FUNCTION", "PROCEDURE"):
+                if re.search(r'\$\$\s*;$', stripped_line):
+                    is_single_line_terminated = True
+            elif stripped_line.endswith(';'):
+                is_single_line_terminated = True
+            
+            if not is_single_line_terminated:
+                in_ignored_multiline_statement = True
+                ignored_statement_type = current_statement_main_type
+            # If single-line, it's handled, and in_ignored_multiline_statement remains False.
+            continue
+
+        # Detect other ignored single-line commands (like \set, SET var =, etc.)
+        if other_ignored_line_regex.match(stripped_line):
+            cleaned_lines.append(f"--{line}")
+            continue
+        
+        # If none of the above, keep the line as is
+        cleaned_lines.append(line)
+        
+    content = "\n".join(cleaned_lines)
+    with open("cleaned_sql.sql", "w", encoding="utf-8") as f:
+        f.write(content)
+    # Basic validation: Check if any relevant DDL patterns are present after cleaning.
+    if not content or not any(re.search(pattern, content, re.IGNORECASE) for pattern in SQL_PATTERNS):
+        raise InvalidSQLError("Invalid SQL or no relevant DDL statements found after cleaning.")
+
+    # Optional: Use SQLFluff to lint/fix SQL for better parsability if it's installed.
+    try:
+        import sqlfluff
+        content = sqlfluff.fix(content, dialect='postgres', fix_even_unparsable=True)
+    except ImportError:
+        pass # SQLFluff is optional.
+
+    # Parse the preprocessed SQL content using sqlglot.
+    try:
+        # `read='postgres'` tells sqlglot to use PostgreSQL dialect.
+        parsed_statements = parse(content, read='postgres') 
+        if not parsed_statements:  # parse can return None or empty list if content is effectively empty.
+            return [], {}, {}
+    except Exception as e:
+        # Catch parsing errors from sqlglot.
+        raise InvalidSQLError(f"SQL parsing failed with sqlglot: {e}")
+
+    node_types: Dict[str, NodeInfoPG] = {} # Stores info about each node (table, view, CTE).
+    edges: List[Tuple[str, str]] = []    # Stores relationships (dependencies, FKs) as (source, target) tuples.
+
+    # Process each parsed SQL statement from the dump.
+    for stmt_expr in parsed_statements:
+        # Handle CREATE TABLE and CREATE VIEW statements.
+        if isinstance(stmt_expr, exp.Create) and isinstance(stmt_expr.this, exp.Table):
+            table_obj = stmt_expr.this
+            name = table_obj.name
+            schema = _extract_schema(table_obj.args.get('db') or table_obj.args.get('catalog'))
+            
+            # Determine if it's a TABLE, VIEW, MATERIALIZED VIEW, etc.
+            kind = (stmt_expr.args.get('kind') or 'TABLE').upper()
+            # Simplify node type to 'view' if it contains "VIEW", otherwise 'table'.
+            node_type = 'view' if 'VIEW' in kind else 'table'
+            
+            definition_sql = stmt_expr.sql(dialect='postgres') # Get SQL for the CREATE statement.
+            node_key = add_node(name, node_type, schema, definition_sql, node_types)
+
+            # Extract foreign keys defined directly within this CREATE TABLE statement.
+            edges.extend(find_foreign_keys(stmt_expr))
+            
+            # For views or CTAS (CREATE TABLE AS SELECT), find dependencies from the SELECT query.
+            query_expression = stmt_expr.args.get('expression') # This holds the SELECT part.
+            
+            if isinstance(query_expression, exp.With): # Handles CTEs (WITH ... AS ...).
+                # Process Common Table Expressions first.
+                for cte_sub_expr in query_expression.expressions or []: # exp.With.expressions lists exp.CTE.
+                    if isinstance(cte_sub_expr, exp.CTE):
+                        cte_name = cte_sub_expr.alias_or_name
+                        cte_definition_sql = cte_sub_expr.sql(dialect='postgres')
+                        # CTEs are like temporary, schemaless views for the query's scope.
+                        # Schema is None for CTEs.
+                        cte_key = add_node(cte_name, 'cte_view', None, cte_definition_sql, node_types)
+                        
+                        # Find dependencies for this CTE from its own query part (cte_sub_expr.this).
+                        for dep_name, dep_schema in find_dependencies(cte_sub_expr.this):
+                            # Add dependency node (usually a table or another view).
+                            # Definition is None as we only know its name/schema here.
+                            dep_key = add_node(dep_name, 'table', dep_schema, None, node_types)
+                            edges.append((dep_key, cte_key)) # Edge: source_object -> cte_view
+                # The main query part after the WITH clause.
+                query_expression = query_expression.this 
+            
+            if query_expression: # If there's a main query (view's SELECT, CTAS's SELECT).
+                for dep_name, dep_schema in find_dependencies(query_expression):
+                    # These are tables/views the main query selects from.
+                    # Default type to 'table'; actual DDL will confirm/correct type later if needed.
+                    dep_key = add_node(dep_name, 'table', dep_schema, None, node_types)
+                    if node_key: # Ensure the main node was successfully added
+                        edges.append((dep_key, node_key)) # Edge: source_object -> created_table/view
+
+        # Handle ALTER TABLE statements.
+        elif isinstance(stmt_expr, exp.Alter) and isinstance(stmt_expr.this, exp.Table):
+            table_obj = stmt_expr.this
+            name = table_obj.name
+            schema = _extract_schema(table_obj.args.get('db') or table_obj.args.get('catalog'))
+            
+            definition_sql = stmt_expr.sql(dialect='postgres') # Get SQL for the ALTER statement.
+            # Add this ALTER statement's definition to the existing table's node.
+            # Node type is 'table' for ALTER TABLE.
+            _ = add_node(name, 'table', schema, definition_sql, node_types)
+            
+            # Extract foreign keys defined or modified by this ALTER TABLE statement.
+            edges.extend(find_foreign_keys(stmt_expr))
+
+    # Calculate statistics: count of nodes per schema (excluding CTEs from this stat).
+    stats: Dict[str, int] = {}
+    for info_dict in node_types.values():
+        # info_dict is an instance of NodeInfoPG (a TypedDict), which is a dict at runtime.
+        if info_dict.get('type') == 'cte_view': # Check type directly
+            continue # Exclude CTEs from schema object counts.
+        
+        # No need for isinstance(info_dict, dict) here as it's guaranteed by type hints
+        schema_name = info_dict.get('database') or 'public' # Default to 'public' if schema is empty/None.
+        stats[schema_name] = stats.get(schema_name, 0) + 1
+
+    # Create directory for JSON output if it doesn't exist.
+    output_dir = 'json_structure'
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Save edges and node_types to JSON files.
+    try:
+        with open(os.path.join(output_dir, 'edges.json'), 'w', encoding='utf-8') as f_edges:
+            json.dump(edges, f_edges, indent=2)
+        with open(os.path.join(output_dir, 'node_types.json'), 'w', encoding='utf-8') as f_nodes:
+            json.dump(node_types, f_nodes, indent=2)
+    except IOError as e:
+        # Handle potential errors during file writing.
+        print(f"Warning: Could not write JSON output files: {e}")
+
+
+    return edges, node_types, stats

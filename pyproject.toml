@@ -32,8 +32,10 @@ dependencies = [
     "types-pygments>=2.19.0.20250305",
     "types-colorama>=0.4.15.20240311",
     "types-networkx>=3.4.2.20250319",
-    "platformdirs>=4.2.2",             # Added for platform-agnostic data directory
+    "platformdirs>=4.2.2", # Added for platform-agnostic data directory
     "sqlfluff>=3.4.0",
+    "sqlparse>=0.5.3",
+    "sqlglot[rs]>=26.16.4",
 ]
 
 [project.scripts]
