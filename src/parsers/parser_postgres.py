@@ -163,6 +163,16 @@ def parse_dump(
 
 
     # Pre-processing: Comment out lines that are not DDL for tables/views or are problematic for parsing.
+    # Remove all comments (single-line and block)
+    def _remove_sql_comments(sql: str) -> str:
+        # Remove block comments
+        sql = re.sub(r'/\*.*?\*/', '', sql, flags=re.DOTALL)
+        # Remove single-line comments
+        sql = re.sub(r'--.*?$', '', sql, flags=re.MULTILINE)
+        return sql
+
+    content = _remove_sql_comments(content)
+    
     lines = content.splitlines()
     cleaned_lines: List[str] = []
     in_copy_data_block: bool = False # Flag for being inside a COPY ... FROM STDIN data block.
@@ -180,6 +190,7 @@ def parse_dump(
         r'^\s*(?:\\connect|\\set|SET\s+[a-zA-Z_][a-zA-Z0-9_]*\s*=|SELECT\s+pg_catalog\.setval)\b',
         re.IGNORECASE
     )
+    
     
     for line in lines:
         stripped_line = line.strip()
@@ -246,7 +257,8 @@ def parse_dump(
         cleaned_lines.append(line)
         
     content = "\n".join(cleaned_lines)
-
+    with open("cleaned_sql.sql", "w", encoding="utf-8") as f:
+        f.write(content)
     # Basic validation: Check if any relevant DDL patterns are present after cleaning.
     if not content or not any(re.search(pattern, content, re.IGNORECASE) for pattern in SQL_PATTERNS):
         raise InvalidSQLError("Invalid SQL or no relevant DDL statements found after cleaning.")
