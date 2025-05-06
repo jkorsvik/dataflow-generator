@@ -643,6 +643,12 @@ def inject_controls_and_styles(
         + "\n</body>",
         1,
     )
+    # Additional fix: highlight SQL in Vis tooltip container
+    tooltip_hook = '<script>if(window.network&&window.Prism){network.on("showPopup",function(){var t=document.querySelector(".vis-tooltip"); if(t){Prism.highlightAllUnder(t);}});}</script>'
+    if '</body>' in html_content:
+        html_content = html_content.replace('</body>', tooltip_hook + '</body>', 1)
+    else:
+        html_content = html_content + tooltip_hook
     return html_content
 
 
@@ -661,51 +667,8 @@ def inject_sql_code_highlighting(html_content: str) -> str:
     prism_js_core = '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>\n'
     prism_js_sql = '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>\n'
     
-    prism_js_trigger = (
-        "<script>\n"
-        "  document.addEventListener('DOMContentLoaded', function () {\n"
-        "    if (!window.Prism) {\n"
-        "      console.error('Dataflow Generator: Prism.js core not loaded.');\n"
-        "      return;\n"
-        "    }\n"
-        "    if (!Prism.languages.sql) {\n"
-        "      console.error('Dataflow Generator: Prism.js SQL language component not loaded.');\n"
-        "      return;\n"
-        "    }\n"
-        "    if (window.network && typeof network.on === 'function') {\n"
-        "      network.on('showPopup', function(popupId) {\n"
-        "        console.log('Dataflow Generator: showPopup event for ID:', popupId);\n"
-        "        setTimeout(function() {\n"
-        "          var popupElement = document.getElementById(popupId);\n"
-        "          if (popupElement) {\n"
-        "            console.log('Dataflow Generator: Popup element found:', popupElement);\n"
-        "            var codeElements = popupElement.querySelectorAll('code.language-sql');\n"
-        "            if (codeElements.length === 0) {\n"
-        "              console.warn('Dataflow Generator: No elements matching \\'code.language-sql\\' found in popup.');\n"
-        "            } else {\n"
-        "              console.log('Dataflow Generator: Found', codeElements.length, 'SQL code elements to highlight.');\n"
-        "            }\n"
-        "            codeElements.forEach(function(codeElement, index) {\n"
-        "              console.log('Dataflow Generator: Highlighting code element #'+index, codeElement);\n"
-        "              try {\n"
-        "                Prism.highlightElement(codeElement);\n"
-        "                console.log('Dataflow Generator: Successfully called Prism.highlightElement for #'+index);\n"
-        "              } catch (e) {\n"
-        "                console.error('Dataflow Generator: Error calling Prism.highlightElement for #'+index, e);\n"
-        "              }\n"
-        "            });\n"
-        "          } else {\n"
-        "            console.warn('Dataflow Generator: Popup element with ID ' + popupId + ' not found after timeout.');\n"
-        "          }\n"
-        "        }, 100);\n" # Increased timeout
-        "      });\n"
-        "      console.log('Dataflow Generator: Prism tooltip highlighting hook is set up.');\n"
-        "    } else {\n"
-        "      console.warn('Dataflow Generator: Vis Network object not ready for tooltip highlighting hook, or Prism not fully loaded.');\n"
-        "    }\n"
-        "  });\n"
-        "</script>\n"
-    )
+    prism_js_trigger = '''<script> document.addEventListener("DOMContentLoaded", function() { if (window.Prism && typeof network.on === "function") { network.on("showPopup", function() { Prism.highlightAll(); }); } }); \</script> '''
+
 
     # Inject CSS in <head>
     if '</head>' in html_content:
@@ -723,7 +686,7 @@ def inject_sql_code_highlighting(html_content: str) -> str:
         html_content = html_content + all_prism_js
         
     # Add fallback Prism highlight hook for dynamic popups
-    fallback_script = '<script>if(window.network && window.Prism){network.on("showPopup",function(){Prism.highlightAll();});}</script>'
+    fallback_script = '<script>document.addEventListener("click", function(){ Prism.highlightAll(); });</script>'
     if '</body>' in html_content:
         html_content = html_content.replace('</body>', fallback_script + '</body>', 1)
     else:

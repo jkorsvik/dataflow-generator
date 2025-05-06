@@ -4,14 +4,11 @@ import re
 from typing import List, Tuple, Dict, TypedDict, Union, Set, Any, Optional  # noqa: F401
 
 from ..dataflow_structs import NodeInfo
+from ..dataflow_structs import SQL_PATTERNS
 from ..exceptions import InvalidSQLError
 import sqlparse  # type: ignore[import]
 
-SCALING_CONSTANT: float = 2
-SQL_PATTERNS = [
-    r"\b(CREATE|SELECT|FROM|JOIN|VIEW|TABLE)\b",
-    r"\b(INSERT|UPDATE|DELETE|DROP|ALTER)\b",
-]
+
 
 # Global variable declarations with updated type annotations
 database_stats: Dict[str, int] = {}

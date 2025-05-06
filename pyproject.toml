@@ -35,6 +35,7 @@ dependencies = [
     "platformdirs>=4.2.2", # Added for platform-agnostic data directory
     "sqlfluff>=3.4.0",
     "sqlparse>=0.5.3",
+    "sqlglot[rs]>=26.16.4",
 ]
 
 [project.scripts]
