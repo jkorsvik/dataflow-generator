@@ -547,6 +547,30 @@ def inject_controls_and_styles(
         <div class="legend-item"><div class="legend-color" style="background-color: #e15759;"></div><div class="legend-label">Unknown</div></div>
     </div>
 
+    <!-- Node Creation FAB and Modal -->
+    <button id="addNodeFab" title="Add Node">+</button>
+    <div id="addNodeModal">
+        <h4>Add New Node</h4>
+        <div class="error" id="addNodeError"></div>
+        <label for="addNodeId">Node ID</label>
+        <input type="text" id="addNodeId" placeholder="Enter node ID..." autocomplete="off">
+        <label for="addNodeType">Type</label>
+        <select id="addNodeType">
+            <option value="table">Table</option>
+            <option value="view">View</option>
+            <option value="cte_view">CTE View</option>
+            <option value="datamarket">Data Market</option>
+            <option value="other">Other</option>
+            <option value="unknown">Unknown</option>
+        </select>
+        <label for="addNodeDatabase">Database</label>
+        <input type="text" id="addNodeDatabase" placeholder="(Optional)">
+        <div class="modal-actions">
+            <button class="add-btn" id="addNodeModalAddBtn">Add</button>
+            <button class="cancel-btn" id="addNodeModalCancelBtn">Cancel</button>
+        </div>
+    </div>
+
     <!-- NEW: Search Icon & Panel -->
     <div id="searchIcon" onclick="toggleSearchPanel()" title="Search (Ctrl+F)">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="#555" xmlns="http://www.w3.org/2000/svg">

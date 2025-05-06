@@ -316,7 +316,7 @@ def parse_dump(
         if not re.match(r"^\s*CREATE", raw_stmt, re.IGNORECASE):
             continue
 
-        comment_pattern = r"(--.*?$|/\*.*?\*/)"
+        comment_pattern = r"(--.*?$|/\*.*?\*/|#.*?$)"
         clean_stmt = re.sub(
             comment_pattern,
             "",

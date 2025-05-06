@@ -818,3 +818,97 @@ div.popup pre {
     margin: 0 2px;
     font-family: monospace;
 }
+
+/* --- Node Creation Floating Action Button (FAB) --- */
+#addNodeFab {
+    position: fixed;
+    left: 210px; /* To the right of the legend (legend is 15px left + ~180px width + 15px padding) */
+    bottom: 30px;
+    width: 48px;
+    height: 48px;
+    background: #28a745;
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    font-size: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1100;
+    transition: background 0.2s;
+}
+#addNodeFab:hover {
+    background: #218838;
+}
+
+/* --- Node Creation Modal --- */
+#addNodeModal {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.18);
+    z-index: 1200;
+    padding: 28px 24px 18px 24px;
+    min-width: 320px;
+    display: none;
+}
+#addNodeModal h4 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-size: 17px;
+    color: #333;
+}
+#addNodeModal label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 13px;
+    color: #444;
+}
+#addNodeModal input, #addNodeModal select {
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 7px 8px;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+#addNodeModal .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 8px;
+}
+#addNodeModal button {
+    padding: 7px 16px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+}
+#addNodeModal .add-btn {
+    background: #28a745;
+    color: #fff;
+}
+#addNodeModal .add-btn:hover {
+    background: #218838;
+}
+#addNodeModal .cancel-btn {
+    background: #eee;
+    color: #333;
+}
+#addNodeModal .cancel-btn:hover {
+    background: #ddd;
+}
+#addNodeModal .error {
+    color: #b00;
+    font-size: 13px;
+    margin-bottom: 6px;
+    min-height: 18px;
+}

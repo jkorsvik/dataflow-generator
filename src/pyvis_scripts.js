@@ -1548,13 +1548,76 @@ function makeDraggable(el) {
 // --- Custom Persistent Tooltip Logic ---
 let persistentTooltip = null;
 let persistentTooltipNodeId = null;
+// --- Track node edit state ---
+let nodeEditState = {
+  nodeId: null,
+  addParents: [],
+  addChildren: [],
+  removeParents: [],
+  removeChildren: [],
+  deleted: false,
+};
+
 function showPersistentTooltip(nodeId, html, event) {
   hidePersistentTooltip();
   persistentTooltip = document.createElement("div");
   persistentTooltip.className = "custom-persistent-tooltip";
+
+  // Get current node info and edges
+  const node = network.body.data.nodes.get(nodeId);
+  const allNodes = network.body.data.nodes.get();
+  const allNodeIds = allNodes.map(n => n.id);
+  const edges = network.body.data.edges.get();
+  const parentIds = edges.filter(e => e.to === nodeId).map(e => e.from);
+  const childIds = edges.filter(e => e.from === nodeId).map(e => e.to);
+
+  // Reset edit state for this node
+  nodeEditState = {
+    nodeId,
+    addParents: [],
+    addChildren: [],
+    removeParents: [],
+    removeChildren: [],
+    deleted: false,
+  };
+
+  // --- UI for editing ---
+  let editHtml = `
+    <div style="margin:8px 0 12px 0; padding:8px; background:#f7f7f7; border-radius:5px;">
+      <b>Edit Node:</b> <span style="color:#555">${nodeId}</span><br>
+      <div style="margin-top:6px;">
+        <label><b>Add Parent:</b></label>
+        <input type="text" id="addParentInput" placeholder="Search node..." style="width:60%" list="allNodeList">
+        <button id="addParentBtn">Add</button>
+      </div>
+      <div style="margin-top:6px;">
+        <label><b>Add Child:</b></label>
+        <input type="text" id="addChildInput" placeholder="Search node..." style="width:60%" list="allNodeList">
+        <button id="addChildBtn">Add</button>
+      </div>
+      <datalist id="allNodeList">
+        ${allNodeIds.filter(id => id !== nodeId).map(id => `<option value="${id}">`).join('')}
+      </datalist>
+      <div style="margin-top:10px;">
+        <b>Current Parents:</b> <span id="parentList">${parentIds.map(pid => `<span class='parent-chip' data-pid='${pid}' style='margin:0 3px; padding:2px 6px; background:#e3e3e3; border-radius:3px; cursor:pointer;'>${pid} <span style='color:#c00; font-weight:bold;' title='Remove'>&times;</span></span>`).join('') || '<i>None</i>'}</span>
+      </div>
+      <div style="margin-top:6px;">
+        <b>Current Children:</b> <span id="childList">${childIds.map(cid => `<span class='child-chip' data-cid='${cid}' style='margin:0 3px; padding:2px 6px; background:#e3e3e3; border-radius:3px; cursor:pointer;'>${cid} <span style='color:#c00; font-weight:bold;' title='Remove'>&times;</span></span>`).join('') || '<i>None</i>'}</span>
+      </div>
+      <div style="margin-top:12px;">
+        <button id="deleteNodeBtn" style="background:#e15759; color:white; border:none; border-radius:4px; padding:6px 12px;">Delete Node</button>
+      </div>
+      <div id="editWarning" style="color:#b00; margin-top:8px; display:none;"></div>
+      <div style="margin-top:12px;">
+        <button id="commitNodeEditBtn" style="background:#28a745; color:white; border:none; border-radius:4px; padding:6px 16px; display:none;">Commit Changes</button>
+      </div>
+    </div>
+  `;
+
   persistentTooltip.innerHTML =
     `<div class="custom-persistent-tooltip-header"><h3>${nodeId}</h3><button class="custom-persistent-tooltip-close" title="Close">&times;</button></div>` +
-    `<div class="custom-persistent-tooltip-content">${html}</div>`;
+    `<div class="custom-persistent-tooltip-content">${html}${editHtml}</div>`;
+
   // Close button handler
   persistentTooltip.querySelector('.custom-persistent-tooltip-close')
     .addEventListener('click', hidePersistentTooltip);
@@ -1577,9 +1640,124 @@ function showPersistentTooltip(nodeId, html, event) {
   persistentTooltip.style.top = y + "px";
   document.body.appendChild(persistentTooltip);
   persistentTooltipNodeId = nodeId;
-  // Prevent click from propagating to network
-  // Removed stopPropagation to ensure document-level mouseup is captured for drag end
+
+  // --- Add event listeners for edit controls ---
+  // Add Parent
+  persistentTooltip.querySelector('#addParentBtn').onclick = function() {
+    const val = persistentTooltip.querySelector('#addParentInput').value.trim();
+    if (val && allNodeIds.includes(val) && val !== nodeId && !parentIds.includes(val) && !nodeEditState.addParents.includes(val)) {
+      nodeEditState.addParents.push(val);
+      updateEditUI();
+    }
+  };
+  // Add Child
+  persistentTooltip.querySelector('#addChildBtn').onclick = function() {
+    const val = persistentTooltip.querySelector('#addChildInput').value.trim();
+    if (val && allNodeIds.includes(val) && val !== nodeId && !childIds.includes(val) && !nodeEditState.addChildren.includes(val)) {
+      nodeEditState.addChildren.push(val);
+      updateEditUI();
+    }
+  };
+  // Remove Parent
+  persistentTooltip.querySelectorAll('.parent-chip').forEach(chip => {
+    chip.onclick = function() {
+      const pid = chip.getAttribute('data-pid');
+      if (parentIds.includes(pid) && !nodeEditState.removeParents.includes(pid)) {
+        nodeEditState.removeParents.push(pid);
+        updateEditUI();
+      }
+    };
+  });
+  // Remove Child
+  persistentTooltip.querySelectorAll('.child-chip').forEach(chip => {
+    chip.onclick = function() {
+      const cid = chip.getAttribute('data-cid');
+      if (childIds.includes(cid) && !nodeEditState.removeChildren.includes(cid)) {
+        nodeEditState.removeChildren.push(cid);
+        updateEditUI();
+      }
+    };
+  });
+  // Delete Node
+  persistentTooltip.querySelector('#deleteNodeBtn').onclick = function() {
+    if (parentIds.length > 0 || childIds.length > 0) {
+      persistentTooltip.querySelector('#editWarning').textContent =
+        'Warning: This node has edges. Deleting it may break the graph! Click again to confirm.';
+      persistentTooltip.querySelector('#editWarning').style.display = 'block';
+      // Require a second click to confirm
+      this.onclick = function() {
+        nodeEditState.deleted = true;
+        updateEditUI();
+      };
+    } else {
+      nodeEditState.deleted = true;
+      updateEditUI();
+    }
+  };
+  // Commit
+  persistentTooltip.querySelector('#commitNodeEditBtn').onclick = function() {
+    // Output changes as JSON to console
+    const changes = {
+      nodeId: nodeEditState.nodeId,
+      addParents: nodeEditState.addParents,
+      addChildren: nodeEditState.addChildren,
+      removeParents: nodeEditState.removeParents,
+      removeChildren: nodeEditState.removeChildren,
+      deleted: nodeEditState.deleted,
+    };
+    console.log('[NODE_EDIT_COMMIT]', JSON.stringify(changes));
+    hidePersistentTooltip();
+  };
+  // Initial UI update
+  updateEditUI();
 }
+
+function updateEditUI() {
+  if (!persistentTooltip) return;
+  // Update parent/child chips to show removals visually
+  const parentList = persistentTooltip.querySelector('#parentList');
+  const childList = persistentTooltip.querySelector('#childList');
+  if (parentList) {
+    parentList.querySelectorAll('.parent-chip').forEach(chip => {
+      const pid = chip.getAttribute('data-pid');
+      if (nodeEditState.removeParents.includes(pid)) {
+        chip.style.textDecoration = 'line-through';
+        chip.style.opacity = '0.5';
+      } else {
+        chip.style.textDecoration = '';
+        chip.style.opacity = '';
+      }
+    });
+  }
+  if (childList) {
+    childList.querySelectorAll('.child-chip').forEach(chip => {
+      const cid = chip.getAttribute('data-cid');
+      if (nodeEditState.removeChildren.includes(cid)) {
+        chip.style.textDecoration = 'line-through';
+        chip.style.opacity = '0.5';
+      } else {
+        chip.style.textDecoration = '';
+        chip.style.opacity = '';
+      }
+    });
+  }
+  // Show commit button if there are any changes
+  const hasChanges = nodeEditState.addParents.length > 0 || nodeEditState.addChildren.length > 0 || nodeEditState.removeParents.length > 0 || nodeEditState.removeChildren.length > 0 || nodeEditState.deleted;
+  const commitBtn = persistentTooltip.querySelector('#commitNodeEditBtn');
+  if (commitBtn) {
+    commitBtn.style.display = hasChanges ? '' : 'none';
+  }
+  // If deleted, gray out everything and show warning
+  if (nodeEditState.deleted) {
+    persistentTooltip.querySelector('.custom-persistent-tooltip-content').style.opacity = '0.5';
+    if (commitBtn) commitBtn.style.display = '';
+    if (persistentTooltip.querySelector('#editWarning')) {
+      persistentTooltip.querySelector('#editWarning').textContent = 'Node marked for deletion. Commit to apply.';
+      persistentTooltip.querySelector('#editWarning').style.display = 'block';
+    }
+  }
+}
+
 function hidePersistentTooltip() {
   if (persistentTooltip) {
     persistentTooltip.remove();
@@ -1587,12 +1765,6 @@ function hidePersistentTooltip() {
     persistentTooltipNodeId = null;
   }
 }
-// Hide tooltip if clicking outside
-document.addEventListener("mousedown", function (e) {
-  if (persistentTooltip && !persistentTooltip.contains(e.target)) {
-    hidePersistentTooltip();
-  }
-});
 // --- Patch vis.js events after network is ready ---
 function patchVisTooltip() {
   if (!window.network) return;
@@ -1624,4 +1796,60 @@ function patchVisTooltip() {
 }
 document.addEventListener("DOMContentLoaded", function () {
   setTimeout(patchVisTooltip, 500);
+});
+
+// --- Node Creation FAB and Modal Logic ---
+document.addEventListener("DOMContentLoaded", function () {
+  const fab = document.getElementById("addNodeFab");
+  const modal = document.getElementById("addNodeModal");
+  const errorDiv = document.getElementById("addNodeError");
+  const idInput = document.getElementById("addNodeId");
+  const typeInput = document.getElementById("addNodeType");
+  const dbInput = document.getElementById("addNodeDatabase");
+  const addBtn = document.getElementById("addNodeModalAddBtn");
+  const cancelBtn = document.getElementById("addNodeModalCancelBtn");
+
+  if (fab && modal && idInput && typeInput && dbInput && addBtn && cancelBtn) {
+    fab.onclick = function () {
+      errorDiv.textContent = "";
+      idInput.value = "";
+      typeInput.value = "table";
+      dbInput.value = "";
+      modal.style.display = "block";
+      idInput.focus();
+    };
+    cancelBtn.onclick = function () {
+      modal.style.display = "none";
+    };
+    addBtn.onclick = function () {
+      const nodeId = idInput.value.trim();
+      const nodeType = typeInput.value;
+      const nodeDb = dbInput.value.trim();
+      // Validate: must not be empty, must not already exist
+      const allNodeIds = window.network?.body?.data?.nodes?.get().map(n => n.id) || [];
+      if (!nodeId) {
+        errorDiv.textContent = "Node ID is required.";
+        idInput.focus();
+        return;
+      }
+      if (allNodeIds.includes(nodeId)) {
+        errorDiv.textContent = "Node ID already exists.";
+        idInput.focus();
+        return;
+      }
+      // Output to console for external processing
+      const newNode = {
+        nodeId,
+        type: nodeType,
+        database: nodeDb,
+      };
+      console.log('[NODE_CREATE]', JSON.stringify(newNode));
+      modal.style.display = "none";
+    };
+    // Allow Enter to submit
+    idInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') addBtn.click(); });
+    dbInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') addBtn.click(); });
+    // Escape closes modal
+    modal.addEventListener('keydown', function(e) { if (e.key === 'Escape') modal.style.display = 'none'; });
+  }
 });
