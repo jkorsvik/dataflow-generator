@@ -9,6 +9,46 @@ import textwrap
 import math  # For ceiling function
 import webbrowser
 
+# SQL syntax highlighting for definitions
+import html # Keep this import if used elsewhere, or remove if only for the duplicated helper
+import re   # Keep this import if used elsewhere, or remove if only for the duplicated helper
+
+def highlight_sql(sql_code: str) -> str:
+    """Applies basic SQL syntax highlighting to SQL code using HTML spans."""
+    
+    if not sql_code:
+        return ""
+    # Ensure html and re are imported if they were removed from the global scope
+    # import html
+    # import re
+    escaped_code = html.escape(sql_code)
+
+    # Order of replacement matters to avoid conflicts (e.g. keywords in comments)
+    # 1. Comments
+    escaped_code = re.sub(r"(--[^\n\r]*)", r"<span class='sql-comment'>\1</span>", escaped_code)
+    escaped_code = re.sub(r"(/\*[\s\S]*?\*/)", r"<span class='sql-comment'>\1</span>", escaped_code, flags=re.MULTILINE)
+
+    # 2. Strings
+    escaped_code = re.sub(r"('([^']|'')*')", r"<span class='sql-string'>\1</span>", escaped_code) # Handles escaped quotes in strings
+    escaped_code = re.sub(r'("([^"]|"")*")', r'<span class="sql-string">\1</span>', escaped_code) # Handles escaped quotes in strings
+
+    # 3. Keywords
+    keyword_pattern = r"\b(SELECT|FROM|WHERE|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|JOIN|GROUP|ORDER|BY|HAVING|UNION|ALL|DISTINCT|AS|AND|OR|NOT|IN|IS|NULL|LIKE|BETWEEN|EXISTS|CASE|WHEN|THEN|ELSE|END|LIMIT|OFFSET)\b"
+    escaped_code = re.sub(keyword_pattern, r"<span class='sql-keyword'>\1</span>", escaped_code, flags=re.IGNORECASE)
+
+    # 4. Functions
+    func_pattern = r"\b(COUNT|SUM|AVG|MIN|MAX|ROW_NUMBER|RANK|DENSE_RANK|LEAD|LAG|FIRST_VALUE|LAST_VALUE|NTH_VALUE|NTILE|CUME_DIST|PERCENT_RANK|CONCAT|COALESCE|CAST|CONVERT|SUBSTRING|TRIM|REPLACE|UPPER|LOWER|LENGTH|CHAR_LENGTH|POSITION|STRPOS|GETDATE|CURRENT_DATE|CURRENT_TIMESTAMP|DATEADD|DATEDIFF|DATEPART|DATENAME|YEAR|MONTH|DAY|HOUR|MINUTE|SECOND|ISNULL|NVL|IFNULL|DECODE)\b"
+    escaped_code = re.sub(func_pattern, r"<span class='sql-function'>\1</span>", escaped_code, flags=re.IGNORECASE)
+
+    # 5. Numbers
+    escaped_code = re.sub(r"\b\d+\.?\d*\b", r"<span class='sql-number'>\g<0></span>", escaped_code)
+
+    # 6. Operators
+    escaped_code = re.sub(r"([+\-*/=<>!~%&|^;(),.])", r"<span class='sql-operator'>\1</span>", escaped_code) # Added comma, dot, semicolon, parentheses
+
+    return escaped_code
+
+
 
 def create_pyvis_figure(
     graph: Union[nx.DiGraph, nx.Graph],  # DO NOT EDIT THIS LINE
@@ -83,12 +123,13 @@ def create_pyvis_figure(
         node_definition = node_info.get("definition")
         definition_html = ""
         if node_definition:
-            import html
-            escaped_definition = html.escape(node_definition)
+            # Use the highlight_sql function from this module
+            highlighted_definition = highlight_sql(node_definition)
+            # DO NOT escape, allow HTML rendering
             definition_html = (
                 f"<div style='margin-top:10px;'><b>Definition:</b>"
                 f"<div style='max-height:200px; overflow-y:auto; border:1px solid #eee; padding:5px; background:#f9f9f9; border-radius:4px;'>"
-                f"<pre style='margin:0; white-space:pre-wrap; word-wrap:break-word; font-size:11px;'>{escaped_definition}</pre>"
+                f"<pre style='margin:0; white-space:pre-wrap; word-wrap:break-word; font-size:11px;'><code>{highlighted_definition}</code></pre>"
                 f"</div></div>"
             )
 
@@ -403,6 +444,8 @@ def inject_controls_and_styles(
             color: #333;
             font-size: 13px;
             line-height: 1.4;
+            max-height: 60vh;      /* Add a maximum height */
+            overflow-y: auto;       /* Enable vertical scrolling if needed */
         }
         div.vis-tooltip b {
             color: #111;
@@ -418,6 +461,19 @@ def inject_controls_and_styles(
             white-space: pre-wrap;
             word-wrap: break-word;
         }
+        /* Styles for SQL syntax highlighting */
+        div.vis-tooltip pre code { /* Ensure code block behaves as expected */
+            display: block;
+            font-family: Consolas, "Courier New", monospace; /* Monospace font for code */
+            /* font-size is inherited from pre or can be set here */
+        }
+        .sql-comment { color: #6a737d; font-style: italic; } /* GitHub-like comment color */
+        .sql-string { color: #032f62; } /* GitHub-like string color */
+        .sql-keyword { color: #d73a49; font-weight: bold; } /* GitHub-like keyword color */
+        .sql-function { color: #6f42c1; } /* GitHub-like function color */
+        .sql-number { color: #005cc5; } /* GitHub-like number color */
+        .sql-operator { color: #d73a49; } /* GitHub-like operator color (can be same as keyword or different) */
+
         #loadingOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(200, 200, 200, 0.6); z-index: 1002; display: none; justify-content: center; align-items: center; font-size: 1.5em; color: #333; text-align: center; }
         #loadingOverlay .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -2389,6 +2445,74 @@ def inject_controls_and_styles(
                  if (network?.fit) {{ network.fit({{ animation: false }}); }}
             }}, 250);
         }});
+
+    // --- Custom Persistent Tooltip Logic ---
+    let persistentTooltip = null;
+    let persistentTooltipNodeId = null;
+    function showPersistentTooltip(nodeId, html, event) {{
+        hidePersistentTooltip();
+        persistentTooltip = document.createElement('div');
+        persistentTooltip.className = 'vis-tooltip';
+        persistentTooltip.innerHTML = `<button style='float:right; margin-left:10px;' onclick='hidePersistentTooltip()'>&#10005;</button>` + html;
+        persistentTooltip.style.position = 'fixed';
+        persistentTooltip.style.zIndex = 2000;
+        persistentTooltip.style.pointerEvents = 'auto';
+        persistentTooltip.style.maxWidth = '450px';
+        persistentTooltip.style.maxHeight = '60vh';
+        persistentTooltip.style.overflowY = 'auto';
+        // Position near mouse, but keep in viewport
+        let x = event.clientX + 16;
+        let y = event.clientY + 16;
+        if (x + 450 > window.innerWidth) x = window.innerWidth - 470;
+        if (y + 300 > window.innerHeight) y = window.innerHeight - 320;
+        persistentTooltip.style.left = x + 'px';
+        persistentTooltip.style.top = y + 'px';
+        document.body.appendChild(persistentTooltip);
+        persistentTooltipNodeId = nodeId;
+        // Prevent click from propagating to network
+        persistentTooltip.addEventListener('mousedown', e => e.stopPropagation());
+        persistentTooltip.addEventListener('mouseup', e => e.stopPropagation());
+    }}
+    function hidePersistentTooltip() {{
+        if (persistentTooltip) {{
+            persistentTooltip.remove();
+            persistentTooltip = null;
+            persistentTooltipNodeId = null;
+        }}
+    }}
+    // Hide tooltip if clicking outside
+    document.addEventListener('mousedown', function(e) {{
+        if (persistentTooltip && !persistentTooltip.contains(e.target)) {{
+            hidePersistentTooltip();
+        }}
+    }});
+    // --- Patch vis.js events after network is ready ---
+    function patchVisTooltip() {{
+        if (!window.network) return;
+        window.network.on('click', function(params) {{
+            hidePersistentTooltip();
+            if (params.nodes && params.nodes.length > 0) {{
+                const nodeId = params.nodes[0];
+                const node = window.network.body.data.nodes.get(nodeId);
+                if (node && node.title) {{
+                    // Use last pointer event for position
+                    let evt = window.network.lastPointerEvent || window.event;
+                    if (!evt && params.event && params.event.srcEvent) evt = params.event.srcEvent;
+                    if (!evt) evt = {{ clientX: window.innerWidth/2, clientY: window.innerHeight/2 }};
+                    showPersistentTooltip(nodeId, node.title, evt);
+                }}
+            }}
+        }});
+        // Save pointer event for click positioning
+        window.network.on('hoverNode', function(params) {{
+            if (params.event && params.event.srcEvent) {{
+                window.network.lastPointerEvent = params.event.srcEvent;
+            }}
+        }});
+    }}
+    document.addEventListener('DOMContentLoaded', function() {{
+        setTimeout(patchVisTooltip, 500);
+    }});
     </script>
     """)
 

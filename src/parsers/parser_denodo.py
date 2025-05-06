@@ -165,10 +165,12 @@ def add_node(full_name: str, node_type: str, is_dependency: bool = False, defini
     # Add/update node_types
     if base_name not in node_types:
         # New node - Add it directly
-        node_info_dict = {
+        # Initialize with all required keys for NodeInfo, definition can be None
+        node_info_dict: NodeInfo = {
             "type": node_type,
             "database": database,
             "full_name": effective_full_name,
+            "definition": None,
         }
         if definition and not is_dependency:
             node_info_dict["definition"] = definition
