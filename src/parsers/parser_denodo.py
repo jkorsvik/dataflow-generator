@@ -62,7 +62,7 @@ def find_script_dependencies(
     # Use the tried-and-tested comprehensive pattern for table references
     table_pattern = re.compile(
         r"""
-        \b(?:FROM|JOIN|INTO|IMPLEMENTATION)\s+ # Added INTO/IMPL back if they were there
+        \b(?:FROM(?:\s+FLATTEN)?|JOIN|INTO|IMPLEMENTATION)\s+ # Support FROM FLATTEN
         (?:')?                    # Optional opening quote
         (?!\s*SELECT\b|\s*WITH\b|\s*VALUES\b|\s*LATERAL\b|\s*UNNEST\b|\s*TABLE\b|\() # Negative lookahead
         \s*
@@ -363,6 +363,21 @@ def parse_dump(
             if load_query_match:
                 definition_part = load_query_match.group(1).replace("''", "'")
         if not definition_part:
+            # Special handling for INTERFACE VIEW: look for SET IMPLEMENTATION dependency
+            imp_pattern = re.compile(
+                r"SET\s+IMPLEMENTATION\s+([a-zA-Z0-9_\.]+)", re.IGNORECASE | re.MULTILINE
+            )
+            imp_match = imp_pattern.search(clean_stmt)
+            if imp_match:
+                implementation_name = imp_match.group(1).strip()
+                if implementation_name:
+                    actual_dep_base = add_node(
+                        implementation_name, guess_type(implementation_name), is_dependency=True
+                    )
+                    if actual_dep_base:
+                        edge = (actual_dep_base, target_base_name)
+                        if edge not in edges and actual_dep_base != target_base_name:
+                            edges.append(edge)
             continue
         # --- End Extract Definition Part ---
 
