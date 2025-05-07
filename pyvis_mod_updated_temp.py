@@ -714,7 +714,7 @@ def inject_sql_code_highlighting(html_content: str) -> str:
     prism_js_core = '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>\n'
     prism_js_sql = '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>\n'
     
-    prism_js_trigger = '''<script> document.addEventListener("DOMContentLoaded", function() { if (window.Prism && typeof network.on === "function") { network.on("showPopup", function() { Prism.highlightAll(); }); } }); </script> '''
+    prism_js_trigger = '''<script> document.addEventListener("DOMContentLoaded", function() { if (window.Prism && typeof network.on === "function") { network.on("showPopup", function() { Prism.highlightAll(); }); } }); \</script> '''
 
     # Inject CSS in <head>
     if '</head>' in html_content:

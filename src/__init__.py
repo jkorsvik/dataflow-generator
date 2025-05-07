@@ -1,4 +1,4 @@
-from src import (
+from .  import (
     dataflow,
     dataflow_command,
     generate_data_flow,
