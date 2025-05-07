@@ -19,7 +19,7 @@ This tool generates visual representations of data flows based on Denodo metadat
 
 ### Dependencies
 
-- Python 3.10 or higher
+- Python 3.12 or higher
 - UV package manager
 
 ### Setup

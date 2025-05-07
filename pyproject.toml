@@ -15,8 +15,16 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
 ]
-keywords = ["dataflow", "visualization", "vql", "denodo", "diagram"]
-requires-python = ">=3.10"
+keywords = [
+    "dataflow",
+    "visualization",
+    "vql",
+    "denodo",
+    "diagram",
+    "data-flow-generator",
+    "generator",
+]
+requires-python = ">=3.12"
 dependencies = [
     "colorama==0.4.6",
     "narwhals==1.36.0",
