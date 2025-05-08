@@ -263,17 +263,24 @@ function highlightSearchResults() {
 
     const allNodeIdsInNetwork = Object.keys(window.network.body.nodes); // More robust way to get all node IDs
 
-    if (shouldDimOthers) {
-        const nodesToUpdate = allNodeIdsInNetwork.map(id => {
-            if (!currentSearchResults.includes(id)) {
-                return { id: id, opacity: 0.25 };
+        if (shouldDimOthers) {
+            const nodesToUpdate = allNodeIdsInNetwork.map(id => {
+                if (!currentSearchResults.includes(id)) {
+                    return { id: id, opacity: 0.25 };
+                }
+                return null; // Will be filtered out
+            }).filter(n => n);
+            if (nodesToUpdate.length > 0) {
+                // Apply opacity changes without triggering stabilization
+                nodesToUpdate.forEach(update => {
+                    const nodeObj = window.network.body.nodes[update.id];
+                    if (nodeObj) {
+                        nodeObj.setOptions({ opacity: update.opacity });
+                    }
+                });
+                window.network.redraw();
             }
-            return null; // Will be filtered out
-        }).filter(n => n);
-        if (nodesToUpdate.length > 0) {
-            window.network.body.data.nodes.update(nodesToUpdate);
         }
-    }
 
     let nodesToHighlight = [];
     if (shouldHighlightAll) {
@@ -299,7 +306,18 @@ function highlightSearchResults() {
         }
     }
     if (nodesToHighlight.length > 0) {
-        window.network.body.data.nodes.update(nodesToHighlight);
+        // Apply highlight changes without triggering stabilization
+        nodesToHighlight.forEach(update => {
+            const nodeObj = window.network.body.nodes[update.id];
+            if (nodeObj) {
+                nodeObj.setOptions({
+                    borderWidth: update.borderWidth,
+                    borderColor: update.borderColor,
+                    opacity: update.opacity
+                });
+            }
+        });
+        window.network.redraw();
     }
     // No need to call network.redraw() explicitly if using dataset.update()
 }
@@ -312,24 +330,19 @@ function resetSearchHighlights() {
 
     // Get default options to reset to. This is a bit tricky as individual nodes might have their own defaults.
     // For simplicity, we reset to the global defaults or clear specific overrides.
-    const nodesToReset = allNodeIdsInNetwork.map(nodeId => {
-        const node = window.network.body.nodes[nodeId];
-        // Only reset if it seems to have search-specific styles
-        if (node && (node.options.borderColor === "#e91e63" || node.options.borderColor === "#ff5722" || node.options.opacity < 1.0)) {
-            return {
-                id: nodeId,
-                // Resetting to 'undefined' will make vis.js use its default/original settings.
-                // If specific original values were stored, they could be restored here.
+    const nodesToResetObjects = allNodeIdsInNetwork
+        .map(nodeId => window.network.body.nodes[nodeId])
+        .filter(node => node && (node.options.borderColor === "#e91e63" || node.options.borderColor === "#ff5722" || node.options.opacity < 1.0));
+    
+    if (nodesToResetObjects.length > 0) {
+        nodesToResetObjects.forEach(node => {
+            node.setOptions({
                 borderWidth: undefined,
                 borderColor: undefined,
-                opacity: undefined, // Let vis.js handle default opacity (usually 1.0)
-            };
-        }
-        return null;
-    }).filter(n => n);
-
-    if (nodesToReset.length > 0) {
-        window.network.body.data.nodes.update(nodesToReset);
+                opacity: undefined,
+            });
+        });
+        window.network.redraw();
     }
 
     if (searchStatus && currentSearchQuery) searchStatus.textContent = `Found ${currentSearchResults.length} results for "${currentSearchQuery}"`;

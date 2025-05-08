@@ -123,12 +123,10 @@ function onNetworkReady() {
         window.network.on("stabilizationProgress", (params) => {
             // console.log(`Stabilization progress: ${params.iterations}/${params.total} iterations.`);
             // Optionally update a more detailed loading message or progress bar here
-            showLoadingOverlay(`Stabilizing: ${params.iterations}/${params.total}`);
         });
 
         window.network.on("startStabilizing", () => {
             console.log("Network stabilization started...");
-            showLoadingOverlay("Stabilizing network...");
         });
 
         // If physics is disabled, stabilization events might not fire, ensure overlay is hidden.

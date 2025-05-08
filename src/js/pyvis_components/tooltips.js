@@ -364,6 +364,83 @@ function commitNodeChanges() {
     // If updating vis.js directly:
     // applyDirectNetworkChanges(changes);
 
+    // --- Apply visual updates to the node on the client-side after commit ---
+    if (window.network && window.network.body && window.network.body.data && window.network.body.data.nodes) {
+        const nodeIdToUpdate = changes.nodeId;
+        const nodeObject = window.network.body.nodes[nodeIdToUpdate]; // Get the vis.js node object
+
+        if (nodeObject) {
+            let updateOptions = {};
+            // Retrieve the original label, attempt to strip any "❌ " prefix if it was previously marked.
+            let originalLabel = nodeObject.options.label || nodeIdToUpdate;
+            if (typeof originalLabel === 'string' && originalLabel.startsWith("❌ ")) {
+                originalLabel = originalLabel.substring(2).trim();
+            }
+            
+            // Store original colors if not already stored, for proper reset
+            if (nodeObject.options.originalColor === undefined) {
+                nodeObject.options.originalColor = JSON.parse(JSON.stringify(nodeObject.options.color || {}));
+            }
+            if (nodeObject.options.originalFont === undefined) {
+                nodeObject.options.originalFont = JSON.parse(JSON.stringify(nodeObject.options.font || {}));
+            }
+             if (nodeObject.options.originalOpacity === undefined) {
+                nodeObject.options.originalOpacity = nodeObject.options.opacity !== undefined ? nodeObject.options.opacity : 1.0;
+            }
+
+
+            if (changes.deleted) {
+                updateOptions = {
+                    // id: nodeIdToUpdate, // ID is not needed for setOptions on the object itself
+                    label: "❌ " + originalLabel,
+                    opacity: 0.4, // Dim the node more significantly
+                    color: { // Specific colors for deleted state
+                        background: '#E0E0E0', // Light gray background
+                        border: '#D32F2F',     // Darker Red border
+                        highlight: {
+                            background: '#EEEEEE',
+                            border: '#D32F2F'
+                        }
+                    },
+                    font: { color: '#D32F2F' } // Darker Red text for the label
+                };
+            } else if (changes.addParents.length > 0 || changes.addChildren.length > 0 || changes.removeParents.length > 0 || changes.removeChildren.length > 0) {
+                updateOptions = {
+                    // id: nodeIdToUpdate,
+                    label: originalLabel, // Keep original label (without cross)
+                    opacity: 0.75, // Slightly dim for modification
+                    color: {
+                        ...(nodeObject.options.originalColor || {}), // Start with original/default colors
+                        border: '#FF8F00', // Bright Orange border for modification
+                        highlight: {
+                             ...(nodeObject.options.originalColor?.highlight || {}),
+                            border: '#FF8F00'
+                        }
+                    },
+                    font: { ...(nodeObject.options.originalFont || {}), color: (nodeObject.options.originalFont?.color || '#343434') } // Reset font color
+                };
+            } else {
+                 // No structural changes, or an "undo delete" without other changes. Reset to original appearance.
+                updateOptions = {
+                    // id: nodeIdToUpdate,
+                    label: originalLabel, // Ensure no "❌ "
+                    opacity: nodeObject.options.originalOpacity !== undefined ? nodeObject.options.originalOpacity : 1.0,
+                    color: JSON.parse(JSON.stringify(nodeObject.options.originalColor || {})), // Deep copy to restore
+                    font: JSON.parse(JSON.stringify(nodeObject.options.originalFont || {}))   // Deep copy to restore
+                };
+            }
+
+            if (Object.keys(updateOptions).length > 0) {
+                nodeObject.setOptions(updateOptions);
+                console.log(`Visual update applied to node ${nodeIdToUpdate}:`, JSON.stringify(updateOptions));
+                // window.network.redraw(); // May not be needed if setOptions triggers redraw
+            }
+        } else {
+            console.warn(`Node ${nodeIdToUpdate} not found in network.body.nodes for visual update.`);
+        }
+    }
+    // --- End of visual updates ---
+
     hidePersistentTooltip(); // Close tooltip after committing
     // Optionally, re-select the node or refresh parts of the graph if changes were applied locally
 }

@@ -912,3 +912,20 @@ div.popup pre {
     margin-bottom: 6px;
     min-height: 18px;
 }
+
+/* Deleted node styling */
+.deleted-node {
+    opacity: 0.4 !important;
+    position: relative;
+}
+.deleted-node::after {
+    content: "❌";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.2em;
+    color: #D32F2F;
+    text-shadow: 0 0 2px rgba(0,0,0,0.3);
+    pointer-events: none;
+}
