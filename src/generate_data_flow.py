@@ -1,4 +1,3 @@
-import json
 import os
 
 import networkx as nx
@@ -50,10 +49,10 @@ def draw_focused_data_flow(
     auto_open=False,
     see_ancestors=True,
     see_descendants=True,
-):
+) -> Union[None, str]:
     print(f"Generating focused data flow{' for ' + file_name if file_name else ''}...")
     print(f"Focus nodes: {focus_nodes}")
-    G = nx.DiGraph()
+    G: nx.DiGraph = nx.DiGraph()
     G.add_edges_from(edges)
     valid_nodes_set = set(node_types.keys())
     nodes_in_edges = set(u for u, v in edges) | set(v for u, v in edges)
@@ -63,7 +62,7 @@ def draw_focused_data_flow(
 
     if not existing_focus_nodes:
         print(f"Warning: Focus nodes {focus_nodes} not found.")
-        return
+        return None
     if len(existing_focus_nodes) < len(focus_nodes):
         print(
             f"Warning: Missing focus nodes: {set(focus_nodes) - set(existing_focus_nodes)}"
@@ -86,7 +85,7 @@ def draw_focused_data_flow(
     focused_subgraph = G.subgraph(subgraph_nodes).copy()
     if not focused_subgraph.nodes():
         print("Warning: Focused subgraph empty.")
-        return
+        return None
 
     # Prepare node types for focused view
     subgraph_node_types = {
@@ -99,7 +98,7 @@ def draw_focused_data_flow(
     }
 
     # Use the draw_pyvis_html function
-    pyvis_mod.draw_pyvis_html(
+    return pyvis_mod.draw_pyvis_html(
         list(focused_subgraph.edges()),
         subgraph_node_types,
         save_path=save_path,
