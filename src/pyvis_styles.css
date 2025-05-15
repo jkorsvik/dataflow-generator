@@ -272,3 +272,35 @@ div.vis-tooltip br { display: block !important; }
 .tooltip-commit-button:hover { background: #b71c1c !important; }
 @keyframes pulseCommit { 0% { box-shadow: 0 0 0 0 rgba(211,47,47,0.4); } 70% { box-shadow: 0 0 0 8px rgba(211,47,47,0.1); } 100% { box-shadow: 0 0 0 0 rgba(211,47,47,0.0); } }
 .tooltip-edit-warning { background: #fff3e0; color: #d84315; border: 1px solid #ffccbc; border-radius: 4px; padding: 7px 12px; margin-top: 10px; font-weight: bold; font-size: 13px; box-shadow: 0 2px 8px rgba(255,152,0,0.08); display: block; }
+
+.tippy-box[data-theme~='pyvis-hover'] {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px; /* Minimal font size */
+    line-height: 1.4;
+    background-color: #282c34; /* Dark, sleek background */
+    color: #abb2bf;    /* Light grey, readable text */
+    border-radius: 4px;
+    padding: 7px 12px; /* Balanced padding */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); /* Subtle shadow */
+    text-align: left;
+    max-width: 300px; /* Prevent overly wide tooltips */
+}
+
+.tippy-box[data-theme~='pyvis-hover'] .tippy-content {
+    padding: 0; 
+}
+
+.tippy-box[data-theme~='pyvis-hover'] .tippy-arrow {
+    color: #282c34; /* Arrow matches the tooltip background */
+}
+
+/* Styling for bold text (node name) inside the hover tooltip */
+.tippy-box[data-theme~='pyvis-hover'] b {
+    color: #e6efff; /* A slightly brighter, desaturated blue/white for prominence */
+    font-weight: 600;
+}
+
+/* Styling for line breaks if any still slip through (though content is simple) */
+.tippy-box[data-theme~='pyvis-hover'] br {
+    margin-bottom: 2px; /* Small space after a line break */
+}

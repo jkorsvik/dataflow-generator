@@ -3,25 +3,32 @@
 (function(window) {
     function initHoverTooltips(network) {
         // Vis.js hover should be enabled by default from Python's initial_options.
-        // We just ensure hoverConnectedEdges is false if that's the desired behavior for Tippy.
-        network.setOptions({ interaction: { hoverConnectedEdges: false } });
+        // Ensure hoverConnectedEdges is false if that's the desired behavior for Tippy.
+        if (network.options.interaction) {
+            network.setOptions({ interaction: { hoverConnectedEdges: false } });
+        } else {
+            // Fallback if interaction options are not set, though unlikely with pyvis_mod.py
+            network.setOptions({ interaction: { hover: true, hoverConnectedEdges: false } });
+        }
 
         const tip = tippy(document.body, {
             getReferenceClientRect: () => ({ width:0, height:0, top:0, bottom:0, left:0, right:0 }),
             content: '',
             allowHTML: true,
-            theme: 'light-border', 
-            animation: 'shift-away', 
-            delay: [150, 50], // Adjusted delay for a slightly quicker appearance
-            trigger: 'manual',
-            placement: 'top',
+            theme: 'pyvis-hover', // Custom theme name, style in pyvis_styles.css
+            animation: 'fade', 
+            delay: [200, 50], // show (200ms), hide (50ms)
+            trigger: 'manual', // We control show/hide manually
+            placement: 'top-start', 
             arrow: true,
-            inertia: true,
-            maxWidth: 350, // Set a max width for hover tooltips
+            inertia: false, 
+            maxWidth: 350, // Max width for the hover tooltip
+            appendTo: () => document.body,
+            interactive: false, // Hover tooltips are typically not interactive
         })[0];
         
         network._hoverTip = tip;
-        // console.log('Tippy instance stored on network._hoverTip:', tip);
+        // console.log('Tippy instance for hover stored on network._hoverTip:', tip);
 
         const container = network.body.container;
         let mouseX = 0, mouseY = 0;
@@ -35,89 +42,81 @@
             if (!t) return;
 
             for (const m of mutationsList) {
-                // Ensure we are targeting the .vis-tooltip element itself or its direct child that changed
-                const el = m.target.classList && m.target.classList.contains('vis-tooltip') 
-                           ? m.target 
-                           : (m.target.parentElement && m.target.parentElement.classList.contains('vis-tooltip') 
-                              ? m.target.parentElement 
-                              : null);
+                const visTooltipEl = m.target.classList && m.target.classList.contains('vis-tooltip') 
+                               ? m.target 
+                               : (m.target.parentElement && m.target.parentElement.classList.contains('vis-tooltip') 
+                                  ? m.target.parentElement 
+                                  : null);
 
-                if (!el) continue;
-
-                // console.log('Hover observer fired for .vis-tooltip mutation:', el, 'visibility:', el.style.visibility, 'display:', el.style.display, 'opacity:', el.style.opacity, 'innerHTML:', el.innerHTML.substring(0,100));
+                if (!visTooltipEl) continue;
                 
-                // Vis.js often uses 'display: block/none' or modifies 'left'/'top' from off-screen.
-                // It also might be briefly visible then hidden if content is empty.
-                const hasContent = el.innerHTML.trim() !== '';
-                const isStyledVisible = el.style.visibility === 'visible' || (el.style.display !== 'none' && el.style.display !== '');
-                // Check if it's positioned on screen (Vis.js moves it from -9999px)
-                const isPositioned = parseFloat(el.style.left) > -5000 && parseFloat(el.style.top) > -5000;
+                const hasContent = visTooltipEl.innerHTML.trim() !== '';
+                const isPositionedOnScreen = parseFloat(visTooltipEl.style.left) > -5000 && visTooltipEl.style.display === 'block';
 
+                if (isPositionedOnScreen && hasContent) {
+                    let fullHtmlContent = visTooltipEl.innerHTML;
+                    let briefHoverContent = fullHtmlContent; // Default to full if separator not found
 
-                if (isStyledVisible && hasContent && isPositioned) {
-                    // console.log("Native tooltip is visible with content, showing Tippy.");
-                    // For hover tooltips, we usually want something brief.
-                    // The full `el.innerHTML` comes from `node.title`.
-                    // If `node.title` includes the lengthy definition, we might want to strip it here for the hover.
-                    // For now, let's use it as is, but this is a point of refinement.
-                    let tippyContent = el.innerHTML;
+                    const separator = "<div class='pyvis-hover-separator' style='display:none !important;'>---HOVER_END---</div>";
+                    const separatorIndex = fullHtmlContent.indexOf(separator);
+
+                    if (separatorIndex !== -1) {
+                        briefHoverContent = fullHtmlContent.substring(0, separatorIndex).trim();
+                    } else {
+                        // console.warn("Pyvis hover separator not found in node title. Full title used for hover.");
+                    }
                     
-                    // Optional: Simple way to get only the first part (e.g., before "Definition:")
-                    const defMarker = "<b>Definition:</b>";
-                    const defIndex = tippyContent.indexOf(defMarker);
-                    if (defIndex > 0) { // Check >0 to ensure some base content exists before definition
-                        // Take content before the definition, removing potential trailing <br> or divs.
-                        let briefContent = tippyContent.substring(0, defIndex);
-                        // Remove trailing container div of definition if it was included.
-                        const divEndMarker = "<div style='margin-top:10px;"; 
-                        const divEndIndex = briefContent.lastIndexOf(divEndMarker);
-                        if (divEndIndex > 0 && divEndIndex > briefContent.length - 50) { // Heuristic
-                            briefContent = briefContent.substring(0, divEndIndex);
-                        }
-                        briefContent = briefContent.replace(/<br\s*\/?>\s*$/, ""); // Remove trailing <br>
-                        tippyContent = briefContent.trim();
+                    if (briefHoverContent.trim() === "") {
+                        if (t.state.isShown) t.hide();
+                        continue;
                     }
 
-
                     t.setProps({
-                        content: tippyContent,
+                        content: briefHoverContent,
                         getReferenceClientRect: () => ({
                             width: 0, height: 0,
                             top: mouseY, bottom: mouseY,
                             left: mouseX, right: mouseX,
                         }),
                     });
-                    if (!t.state.isShown) { t.show(); }
+                    if (!t.state.isShown) { 
+                        t.show(); 
+                    }
                 } else {
-                    if (t.state.isShown) { t.hide(); }
+                    if (t.state.isShown) { 
+                        t.hide(); 
+                    }
                 }
             }
         };
 
-        const observeTooltipElement = (visEl) => {
-            // console.log("Observing .vis-tooltip element for hover:", visEl);
+        const observeVisTooltip = (visEl) => {
+            // console.log("Observing .vis-tooltip element for hover tooltips:", visEl);
             const obs = new MutationObserver(onTooltipMutated);
             obs.observe(visEl, { attributes: true, attributeFilter: ['style'], childList: true, subtree: true, characterData: true });
+            network._hoverTooltipObserver = obs; 
         };
-
-        let visTooltip = container.querySelector('.vis-tooltip');
-        if (visTooltip) {
-            observeTooltipElement(visTooltip);
+        
+        const initialVisTooltip = container.querySelector('.vis-tooltip');
+        if (initialVisTooltip) {
+            observeVisTooltip(initialVisTooltip);
         } else {
-            // console.log(".vis-tooltip not found initially for hover, observing container for additions.");
-            const addObserver = new MutationObserver((mutations, observerInstance) => {
-                for (const m of mutations) {
-                    m.addedNodes.forEach(node => {
-                        if (node.nodeType === 1 && node.classList && node.classList.contains('vis-tooltip')) {
-                            // console.log(".vis-tooltip added to DOM (for hover):", node);
-                            observeTooltipElement(node);
-                            // Do not disconnect this one, Vis.js might remove and re-add its tooltip element
-                            // observerInstance.disconnect(); 
+            // console.log(".vis-tooltip not found initially for hover, observing container for its addition.");
+            const tooltipAddObserver = new MutationObserver((mutations, observer) => {
+                for (const mutation of mutations) {
+                    for (const addedNode of mutation.addedNodes) {
+                        if (addedNode.nodeType === 1 && addedNode.classList && addedNode.classList.contains('vis-tooltip')) {
+                            // console.log(".vis-tooltip detected and added to DOM (for hover):", addedNode);
+                            observeVisTooltip(addedNode);
+                            // Do NOT disconnect this observer, Vis.js might remove and re-add its tooltip element
+                            // if options change or if it internally recycles the element.
+                            // observer.disconnect(); 
+                            return; // Found and attached, exit for this specific added node.
                         }
-                    });
+                    }
                 }
             });
-            addObserver.observe(container, { subtree: true, childList: true });
+            tooltipAddObserver.observe(container, { childList: true, subtree: true });
         }
     }
     window.initHoverTooltips = initHoverTooltips;
