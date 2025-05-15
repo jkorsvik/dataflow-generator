@@ -432,7 +432,7 @@ div.popup {
 }
 
 div.vis-tooltip {
-    display: none !important;
+    visibility: hidden !important;
     background-color: #fff !important;
     border: 1px solid #ccc !important;
     box-shadow: none !important;
@@ -448,6 +448,11 @@ div.vis-tooltip b {
 }
 div.vis-tooltip br {
     display: block !important;
+}
+
+/* --- TIPPY OVERWRITES --- */
+.tippy-box {
+    z-index: 10010 !important;
 }
 
 /* MODIFIED: Styles for <pre> elements within tooltips, to be Prism.js friendly */

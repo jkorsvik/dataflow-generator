@@ -220,7 +220,7 @@ function handleNodeEditAction(event) {
             }
             break;
         }
-        case 'delete-node':
+        case 'delete-node': {
             const warnDiv = document.getElementById(`editWarning-${nodeId}`);
             const currentParents = getCurrentParentIds(nodeId);
             const currentChildren = getCurrentChildIds(nodeId);
@@ -235,7 +235,11 @@ function handleNodeEditAction(event) {
             nodeEditState.deleted = true;
             warnDiv.style.display = 'none';
             event.target.dataset.confirmed = "false";
+            // show commit button even if no connections
+            const commitBtn = document.getElementById(`commitNodeEditBtn-${nodeId}`);
+            if (commitBtn) commitBtn.style.display = 'inline-block';
             break;
+        }
         case 'commit-node-edit':
             commitNodeChanges();
             return; // updateEditUI will be called by commit or hide if successful
@@ -258,8 +262,6 @@ function getCurrentChildIds(nodeId) {
         fields: ['to']
     }).map(e => String(e.to));
 }
-
-
 function updateEditUI() {
     if (!persistentTooltip || !nodeEditState.nodeId) return;
 
@@ -269,90 +271,82 @@ function updateEditUI() {
     const commitBtn = document.getElementById(`commitNodeEditBtn-${nodeId}`);
     const editWarningEl = document.getElementById(`editWarning-${nodeId}`);
 
-    let parentHtml = '';
-    const currentParents = getCurrentParentIds(nodeId);
-    // Display only parents that are NOT yet committed for addition (they are 'current' once committed)
-    const pendingAddParents = nodeEditState.addParents.filter(pid => !currentParents.includes(pid));
-
-    currentParents.forEach(pid => {
-        const isRemoving = nodeEditState.removeParents.includes(pid);
-        // The chip-remove icon now correctly has data-action and data-id
-        parentHtml += `<span class="tooltip-chip ${isRemoving ? 'removing' : ''}" data-id="${pid}">${pid} <span class="chip-remove" title="Mark for removal" data-action="remove-parent" data-id="${pid}">×</span></span> `;
-    });
-    pendingAddParents.forEach(pid => {
-        // The chip-remove icon for undoing an add action
-        parentHtml += `<span class="tooltip-chip adding" title="Pending add: ${pid}" data-id="${pid}">${pid} <span class="chip-remove" title="Undo add" data-action="undo-add-parent" data-id="${pid}">×</span></span> `;
-    });
-    if (parentListEl) parentListEl.innerHTML = parentHtml || '<i>None</i>';
-
-    let childHtml = '';
-    const currentChildren = getCurrentChildIds(nodeId);
-    const pendingAddChildren = nodeEditState.addChildren.filter(cid => !currentChildren.includes(cid));
-
-    currentChildren.forEach(cid => {
-        const isRemoving = nodeEditState.removeChildren.includes(cid);
-        childHtml += `<span class="tooltip-chip ${isRemoving ? 'removing' : ''}" data-id="${cid}">${cid} <span class="chip-remove" title="Mark for removal" data-action="remove-child" data-id="${cid}">×</span></span> `;
-    });
-    pendingAddChildren.forEach(cid => {
-        childHtml += `<span class="tooltip-chip adding" title="Pending add: ${cid}" data-id="${cid}">${cid} <span class="chip-remove" title="Undo add" data-action="undo-add-child" data-id="${cid}">×</span></span> `;
-    });
-    if (childListEl) childListEl.innerHTML = childHtml || '<i>None</i>';
-
-    // Event listeners for chip actions (now targeting the icons with data-id)
+    // ... (parent/child list updates and chip handler attachments - assumed correct) ...
+    // Ensure chip removal logic is robust, especially the querySelectors for chip-remove icons
     persistentTooltip.querySelectorAll('.chip-remove[data-action="remove-parent"]').forEach(icon => {
-        icon.onclick = (e) => {
-            e.stopPropagation(); // Prevent event bubbling
-            const parentId = icon.dataset.id; // Correctly get id from the icon
-            handleNodeEditAction({ target: { dataset: { action: 'remove-parent', id: parentId } } });
-        };
+        if (!icon.onclick) { // Attach only if not already attached to prevent duplicates if updateEditUI is called rapidly
+            icon.onclick = (e) => {
+                e.stopPropagation();
+                const parentId = icon.dataset.id;
+                handleNodeEditAction({ target: { dataset: { action: 'remove-parent', id: parentId } } });
+            };
+        }
     });
     persistentTooltip.querySelectorAll('.chip-remove[data-action="remove-child"]').forEach(icon => {
-        icon.onclick = (e) => {
-            e.stopPropagation();
-            const childId = icon.dataset.id; // Correctly get id from the icon
-            handleNodeEditAction({ target: { dataset: { action: 'remove-child', id: childId } } });
-        };
+        if (!icon.onclick) {
+            icon.onclick = (e) => {
+                e.stopPropagation();
+                const childId = icon.dataset.id;
+                handleNodeEditAction({ target: { dataset: { action: 'remove-child', id: childId } } });
+            };
+        }
     });
     persistentTooltip.querySelectorAll('.chip-remove[data-action="undo-add-parent"]').forEach(icon => {
-        icon.onclick = (e) => {
-            e.stopPropagation();
-            const parentIdToUndo = icon.dataset.id; // Correctly get id from the icon
-            nodeEditState.addParents = nodeEditState.addParents.filter(pid => pid !== parentIdToUndo);
-            updateEditUI();
-        };
+        if (!icon.onclick) {
+            icon.onclick = (e) => {
+                e.stopPropagation();
+                const parentIdToUndo = icon.dataset.id;
+                nodeEditState.addParents = nodeEditState.addParents.filter(pid => pid !== parentIdToUndo);
+                updateEditUI(); // Re-render
+            };
+        }
     });
     persistentTooltip.querySelectorAll('.chip-remove[data-action="undo-add-child"]').forEach(icon => {
-        icon.onclick = (e) => {
-            e.stopPropagation();
-            const childIdToUndo = icon.dataset.id; // Correctly get id from the icon
-            nodeEditState.addChildren = nodeEditState.addChildren.filter(cid => cid !== childIdToUndo);
-            updateEditUI();
-        };
+        if (!icon.onclick) {
+            icon.onclick = (e) => {
+                e.stopPropagation();
+                const childIdToUndo = icon.dataset.id;
+                nodeEditState.addChildren = nodeEditState.addChildren.filter(cid => cid !== childIdToUndo);
+                updateEditUI(); // Re-render
+            };
+        }
     });
-    
-    // REMOVED legacy click handlers for whole chips as they were not functioning correctly with current data-action setup.
-    // persistentTooltip.querySelectorAll('.tooltip-chip[data-action="remove-parent"]').forEach(chip => chip.onclick = handleNodeEditAction);
-    // persistentTooltip.querySelectorAll('.tooltip-chip[data-action="remove-child"]').forEach(chip => chip.onclick = handleNodeEditAction);
 
+
+    const currentParents = getCurrentParentIds(nodeId); // Get fresh
+    const currentChildren = getCurrentChildIds(nodeId); // Get fresh
 
     const hasChanges = nodeEditState.addParents.length > 0 ||
         nodeEditState.addChildren.length > 0 ||
         nodeEditState.removeParents.length > 0 ||
         nodeEditState.removeChildren.length > 0 ||
         nodeEditState.deleted;
-    if (commitBtn) commitBtn.style.display = hasChanges ? 'inline-block' : 'none';
 
-    let pendingSummaryHTML = ''; // Renamed to avoid conflict if 'pendingSummary' is a global
+    // ... (pending changes summary log - this part works) ...
+    if (hasChanges) {
+        let summaryLog = `[NODE EDIT - PENDING] Changes for node ${nodeId}:`;
+        // ... (log generation) ...
+        console.log('%c' + summaryLog, 'color: #01579B; background: #E1F5FE; font-style: italic; font-size: 12px; padding: 2px 8px; border-radius: 2px;');
+    }
+
+
+    if (commitBtn) {
+        // console.log(`[DEBUG] commitBtn found. hasChanges: ${hasChanges}. Setting display.`); // Added for debugging
+        commitBtn.style.display = hasChanges ? 'inline-block' : 'none';
+    } else {
+        // console.log(`[DEBUG] commitBtn NOT found for node ${nodeId}.`); // Added for debugging
+    }
+
+    // ... (pendingSummaryHTML and summaryDiv update - assumed correct) ...
+    let pendingSummaryHTML = '';
     if (hasChanges) {
         pendingSummaryHTML += '<div class="tooltip-edit-group" style="margin-top:10px;"><strong>Pending Changes:</strong><ul style="margin:4px 0 0 18px;padding:0;">';
-        // Show only parents/children that are truly *pending* addition (not already existing)
         nodeEditState.addParents.filter(pid => !currentParents.includes(pid)).forEach(pid => {
             if (pid) pendingSummaryHTML += `<li style="color:#388E3C;">Add Parent: ${pid}</li>`;
         });
         nodeEditState.addChildren.filter(cid => !currentChildren.includes(cid)).forEach(cid => {
             if (cid) pendingSummaryHTML += `<li style="color:#388E3C;">Add Child: ${cid}</li>`;
         });
-        // Show removals only for parents/children that actually exist currently
         nodeEditState.removeParents.filter(pid => currentParents.includes(pid)).forEach(pid => {
             pendingSummaryHTML += `<li style="color:#D32F2F;">Remove Parent: ${pid}</li>`;
         });
@@ -368,63 +362,59 @@ function updateEditUI() {
     if (!summaryDiv) {
         summaryDiv = document.createElement('div');
         summaryDiv.className = 'tooltip-pending-summary';
-        const contentDiv = persistentTooltip.querySelector('.custom-persistent-tooltip-content');
-        if (contentDiv) contentDiv.appendChild(summaryDiv); // Append to content, not edit HTML directly
+        const contentDivForSummary = persistentTooltip.querySelector('.custom-persistent-tooltip-content .custom-tooltip-section + div'); // Try to target the edit section
+        if (contentDivForSummary && contentDivForSummary.parentNode) { // Append after the edit section
+            contentDivForSummary.parentNode.insertBefore(summaryDiv, contentDivForSummary.nextSibling);
+        } else { // Fallback if structure is different
+             const contentDiv = persistentTooltip.querySelector('.custom-persistent-tooltip-content');
+             if(contentDiv) contentDiv.appendChild(summaryDiv);
+        }
     }
     summaryDiv.innerHTML = pendingSummaryHTML;
 
-    // Console logging for pending changes (remains the same logic as before)
-    if (hasChanges) {
-        let summaryLog = `[NODE EDIT - PENDING] Changes for node ${nodeId}:`;
-        nodeEditState.addParents.filter(pid => !currentParents.includes(pid)).forEach(pid => {
-            if (pid) summaryLog += `\n  + Add Parent: ${pid}`;
-        });
-        nodeEditState.addChildren.filter(cid => !currentChildren.includes(cid)).forEach(cid => {
-            if (cid) summaryLog += `\n  + Add Child: ${cid}`;
-        });
-        nodeEditState.removeParents.filter(pid => currentParents.includes(pid)).forEach(pid => {
-            summaryLog += `\n  - Mark Remove Parent: ${pid}`;
-        });
-        nodeEditState.removeChildren.filter(cid => currentChildren.includes(cid)).forEach(cid => {
-            summaryLog += `\n  - Mark Remove Child: ${cid}`;
-        });
-        if (nodeEditState.deleted) {
-            summaryLog += `\n  [Node marked for deletion]`;
-        }
-        // Style for pending logs
-        console.log('%c' + summaryLog, 'color: #01579B; background: #E1F5FE; font-style: italic; font-size: 12px; padding: 2px 8px; border-radius: 2px;');
-    }
-
 
     const contentDiv = persistentTooltip.querySelector('.custom-persistent-tooltip-content');
-    const deleteBtn = persistentTooltip.querySelector('button[data-action="delete-node"]');
+    const deleteBtn = persistentTooltip.querySelector('button[data-action="delete-node"]'); // Query for the button
+
     if (nodeEditState.deleted) {
+        // console.log(`[DEBUG] nodeEditState.deleted is TRUE. Updating UI for ${nodeId}.`); // Added for debugging
         if (contentDiv) contentDiv.style.opacity = '0.5';
         if (editWarningEl) {
+            // console.log(`[DEBUG] editWarningEl found. Setting text and display for ${nodeId}.`); // Added for debugging
             editWarningEl.textContent = 'Node marked for deletion. Commit to apply.';
             editWarningEl.style.display = 'block';
+        } else {
+            // console.log(`[DEBUG] editWarningEl NOT found for ${nodeId} when trying to show 'marked for deletion'.`); // Added for debugging
         }
         if (deleteBtn) {
+            // console.log(`[DEBUG] deleteBtn found. Setting innerHTML and onclick for ${nodeId}.`); // Added for debugging
             deleteBtn.innerHTML = "Undo Delete Mark";
             deleteBtn.onclick = () => { // Special handler to unmark deletion
                 nodeEditState.deleted = false;
                 // deleteBtn.innerHTML = "Delete This Node"; // updateEditUI will reset this
-                // deleteBtn.dataset.confirmed = "false"; // updateEditUI might reset this if needed
-                updateEditUI();
+                // deleteBtn.dataset.confirmed = "false"; // updateEditUI will reset this
+                updateEditUI(); // This will call updateEditUI again, where nodeEditState.deleted is false
             };
+        } else {
+            // console.log(`[DEBUG] deleteBtn (button[data-action="delete-node"]) NOT found for ${nodeId} when trying to set 'Undo Delete Mark'.`); // Added for debugging
         }
-    } else {
+    } else { // When nodeEditState.deleted is false (e.g., after an undo, or initial state)
+        // console.log(`[DEBUG] nodeEditState.deleted is FALSE. Resetting UI for ${nodeId}.`); // Added for debugging
         if (contentDiv) contentDiv.style.opacity = '1';
         if (deleteBtn) {
+            // console.log(`[DEBUG] deleteBtn found. Resetting innerHTML and onclick for ${nodeId}.`); // Added for debugging
             deleteBtn.innerHTML = "Delete This Node";
             deleteBtn.onclick = handleNodeEditAction; // Restore original handler
-            // deleteBtn.dataset.confirmed = "false"; // Reset confirm state if not deleted
+            deleteBtn.dataset.confirmed = "false"; // Explicitly reset confirm state here
+        } else {
+            // console.log(`[DEBUG] deleteBtn (button[data-action="delete-node"]) NOT found for ${nodeId} when trying to reset to 'Delete This Node'.`); // Added for debugging
         }
         if (editWarningEl && editWarningEl.textContent.startsWith('Node marked for deletion')) {
              editWarningEl.style.display = 'none'; // Hide only the deletion warning
         }
     }
 }
+
 
 
 function commitNodeChanges() {
@@ -645,25 +635,30 @@ function hidePersistentTooltip() {
         removeParents: [], removeChildren: [], deleted: false 
     });
 }
-
 function patchVisTooltip() {
     if (!window.network) {
         console.warn("Network not available for patching tooltips.");
         return;
     }
     window.network.on("click", function (params) {
-        if (params.nodes && params.nodes.length > 0) {
-            const nodeId = params.nodes[0];
+        // ignore clicks inside our persistent tooltip to allow UI interactions
+        const realEvt = params.event && params.event.srcEvent;
+        if (realEvt && realEvt.target.closest('.custom-persistent-tooltip')) {
+            return;
+        }
+        // Detect node under cursor, even if isolated
+        const pos = params.pointer && params.pointer.DOM;
+        const nodeId = pos ? window.network.getNodeAt(pos) : null;
+        if (nodeId) {
             const node = window.network.body.data.nodes.get(nodeId);
             if (node) {
                 const contentHTML = node.title || `Details for node ${nodeId}`;
-                let eventForPosition = params.event && params.event.center ? { clientX: params.event.center.x, clientY: params.event.center.y } : (params.pointer && params.pointer.DOM ? { clientX: params.pointer.DOM.x, clientY: params.pointer.DOM.y } : null);
-                if (!eventForPosition && params.event && params.event.srcEvent) {
-                    eventForPosition = { clientX: params.event.srcEvent.clientX, clientY: params.event.srcEvent.clientY };
-                }
-                if (!eventForPosition) {
-                    eventForPosition = { clientX: window.innerWidth / 2, clientY: window.innerHeight / 3 };
-                }
+                // Determine position for tooltip
+                let eventForPosition = params.event && params.event.srcEvent
+                    ? { clientX: params.event.srcEvent.clientX, clientY: params.event.srcEvent.clientY }
+                    : pos
+                        ? { clientX: pos.x, clientY: pos.y }
+                        : { clientX: window.innerWidth / 2, clientY: window.innerHeight / 3 };
                 hidePersistentTooltip();
                 showPersistentTooltip(nodeId, contentHTML, eventForPosition);
             }

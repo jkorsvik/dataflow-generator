@@ -645,6 +645,7 @@ def inject_controls_and_styles(
         "export.js",
         "selection.js",
         "tooltips.js",
+        "hover_tooltips.js",
         "node_actions.js",
         "init.js"
     ]
@@ -674,15 +675,20 @@ def inject_controls_and_styles(
     custom_js = f'<script type="text/javascript">\n{js_content_final}\n</script>'
 
     # --- 4. Injection ---
-    html_content = html_content.replace("</head>", custom_css + "\n</head>", 1)
+    # Inject Tippy.css before our custom CSS
     html_content = html_content.replace(
-        "</body>",
-        custom_html
-        + "\n"
-        + custom_js
-        + "\n</body>",
-        1,
+        "</head>",
+        '<link rel="stylesheet" href="https://unpkg.com/tippy.js@6/dist/tippy.css"/>\n'
+        + custom_css + "\n</head>",
+        1
     )
+    # Inject Tippy.js assets and our custom HTML/JS before closing body
+    const_tippy = (
+        '<script src="https://unpkg.com/@popperjs/core@2"></script>\n'
+        '<script src="https://unpkg.com/tippy.js@6"></script>\n'
+    )
+    body_injection = const_tippy + custom_html + "\n" + custom_js + "\n</body>"
+    html_content = html_content.replace("</body>", body_injection, 1)
     # Additional fix: highlight SQL in Vis tooltip container
     tooltip_hook = '<script>if(window.network&&window.Prism){network.on("showPopup",function(){var t=document.querySelector(".vis-tooltip"); if(t){Prism.highlightAllUnder(t);}});}</script>'
     if '</body>' in html_content:
