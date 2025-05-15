@@ -749,7 +749,7 @@ def draw_pyvis_html(
     draw_edgeless: bool = False,
     focus_nodes: List[str] = [],  # Add focus nodes for potential highlighting
     is_focused_view: bool = False,  # Flag for layout direction
-) -> None:
+) -> Union[str, None]:
     """Generates the interactive Pyvis HTML file."""
     print(
         f"Generating Pyvis HTML{' (focused view)' if is_focused_view else ' (complete view)'}..."
@@ -764,7 +764,7 @@ def draw_pyvis_html(
         nodes_to_draw = nodes_in_edges.union(set(valid_nodes))
         if not nodes_to_draw:
             print("Warning: No nodes to draw for Pyvis HTML.")
-            return
+            return None
         G = G.subgraph(nodes_to_draw).copy()
 
     final_node_types = {
@@ -775,7 +775,7 @@ def draw_pyvis_html(
     }
     if not G.nodes():
         print("Warning: Graph is empty for Pyvis HTML.")
-        return
+        return None
 
     # Use shake_towards_roots for focused views
     shake_dir = is_focused_view
@@ -817,3 +817,5 @@ def draw_pyvis_html(
                 )
     except Exception as e:
         print(f"Error writing Pyvis HTML file {html_file_path}: {e}")
+    finally:
+        return modified_html_content
