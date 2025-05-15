@@ -1,21 +1,9 @@
 ## Changelog
-### 0.2.2 (2025-05-15)
-- **Enhanced Pyvis Node Interaction:**
-    - Successfully implemented robust node deletion, including handling for nodes with and without connections, and providing an "Undo Delete Mark" feature before committing.
-    - Resolved UI update issues related to the "Delete Node" action, ensuring the "Commit Changes" button, "Undo Delete Mark" button text, and warning messages now appear correctly and consistently for all nodes.
-    - Stabilized the persistent tooltip's drag functionality and event handling within the tooltip to prevent unintended actions.
-    - Confirmed SQL definition content is correctly passed to and displayed within the persistent (on-click) node tooltip.
-    - Ensured Prism.js correctly highlights SQL syntax within the persistent tooltip's definition view.
-- Refactor key bindings for navigation and update user prompts; enhance draw_pyvis_html function to return status
-- Implement feature X to enhance user experience and fix bug Y in module Z
-- Enhance node edit UI with improved commit button and warning area; remove deleted node styling in CSS
-- Refactor code structure for improved readability and maintainability
-- Add section for edits and drop script generation in wishes.md
-- Add 'dist/' to .gitignore to exclude distribution files
-- Update Python version requirement to 3.12 and enhance keywords in pyproject.toml; add missing __init__.py file
-- return None or html str in draw_pyvis_html function to prevent unintended behavior
+### 0.2.3 (2025-05-16)
+- Include all static assets (CSS, JS, images, etc.) in the `src` directory in the package distribution for correct Pyvis HTML rendering and asset availability after installation.
+- Update MANIFEST.in to recursively include common static file types in `src/`.
 
-### 0.2.1 (2025-05-06)
+### 0.2.2 (2025-05-15)
 - Added MVP PostgreSQL parser for initial SQL dump support
 - Added option to omit edits from console output (enables integration with web/desktop app, "dataflow-app")
 
