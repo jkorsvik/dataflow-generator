@@ -43,11 +43,11 @@ init()
 
 # Key bindings for back navigation
 # Key bindings
-BACK_KEY = "b"
-ESC_KEY = "\x1b"
-CTRL_C_KEY = "\x03"
-CTRL_D_KEY = "\x04"  # Add Ctrl+D as another way to cancel
-BACK_TOOLTIP = f"(press '{BACK_KEY}', ESC, or Ctrl+C to go back)"
+BACK_KEY = ""  # No single-letter back key
+ESC_KEY = readchar.key.ESC
+CTRL_C_KEY = readchar.key.CTRL_C
+CTRL_D_KEY = readchar.key.CTRL_D
+BACK_TOOLTIP = "(press Esc to go back)"
 
 
 def handle_back_key(key: str) -> bool:
@@ -594,7 +594,7 @@ def toggle_nodes(node_types: Dict[str, Dict[str, str]]) -> List[str]:
     while True:
         clear_screen()
         print(
-            f"Use arrow keys to navigate, Space to toggle, Enter to finish, 's' to search by name, 'e' to show enabled nodes {BACK_TOOLTIP}"
+            f"Use arrow keys to navigate, Space to toggle, Enter to finish, '/' to search by name, 'l' to show enabled nodes {BACK_TOOLTIP}"
         )
         print("Current nodes status:")
 
@@ -638,7 +638,7 @@ def toggle_nodes(node_types: Dict[str, Dict[str, str]]) -> List[str]:
             nodes[current_index].enabled = not nodes[current_index].enabled
         elif key == readchar.key.ENTER:
             break
-        elif key == "e":
+        elif key == "l":
             clear_screen()
             print("\nEnabled nodes:")
             enabled_nodes = [node.name for node in nodes if node.enabled]
@@ -654,7 +654,7 @@ def toggle_nodes(node_types: Dict[str, Dict[str, str]]) -> List[str]:
             # Also check if user pressed 'b' to go back completely
             if result is None or result.lower() == "b":
                 return []
-        elif key == "s":
+        elif key == "/":
             # Enter search mode
             result = search_node(nodes)
             if result is None:
@@ -733,8 +733,8 @@ def search_node(nodes: List[Node]):
         if handle_back_key(key):
             return None  # Return None to indicate back navigation
         elif key == readchar.key.TAB:
-            print("TAB pressed. Exiting loop.")
-            break
+            # Exit search mode without backing out
+            return []
         if key == readchar.key.UP and current_index > 0:
             current_index -= 1
         elif key == readchar.key.DOWN and matches and current_index < len(matches) - 1:
@@ -787,6 +787,7 @@ def select_focus_span() -> Optional[Dict[str, bool]]:
     Returns:
     Dict[str, bool]: A dictionary with the focus span options.
     """
+    clear_screen()
     print(f"\nFocus Span Options {BACK_TOOLTIP}")
 
     ancestors_choice = questionary.confirm(
@@ -856,7 +857,7 @@ def main():
     print(f"{Fore.GREEN}Welcome to the Data Flow Diagram Generator{Style.RESET_ALL}")
     print("This tool helps you visualize SQL data dependencies")
     print(
-        f"Press {Fore.CYAN}{BACK_KEY}{Style.RESET_ALL}, {Fore.CYAN}ESC{Style.RESET_ALL}, or {Fore.CYAN}Ctrl+C{Style.RESET_ALL} at any time to go back or exit\n"
+        f"Press {Fore.CYAN}Esc{Style.RESET_ALL} or {Fore.CYAN}Ctrl+C{Style.RESET_ALL} at any time to go back or exit\n"
     )
     input("Press Enter to continue...")
 

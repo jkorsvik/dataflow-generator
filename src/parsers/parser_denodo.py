@@ -6,7 +6,7 @@ from typing import List, Tuple, Dict, TypedDict, Union, Set, Any, Optional  # no
 from ..dataflow_structs import NodeInfo
 from ..dataflow_structs import SQL_PATTERNS
 from ..exceptions import InvalidSQLError
-import sqlparse  # type: ignore[import]
+import sqlparse  # type: ignore
 
 
 
