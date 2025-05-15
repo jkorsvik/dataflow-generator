@@ -345,22 +345,6 @@ input:checked+.slider:before {
     color: #555;
 }
 
-/* Card-style tooltip for node info and definition */
-div.vis-tooltip {
-    font-family: Arial, sans-serif;
-    white-space: normal;
-    padding: 10px;
-    background-color: #f9f9f9;
-    border: 1px solid #ddd;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-    border-radius: 6px;
-    max-width: 450px;
-    color: #333;
-    font-size: 13px;
-    line-height: 1.4;
-    max-height: 50vh;
-    overflow-y: auto;
-}
 
 /* Custom persistent tooltip */
 .custom-persistent-tooltip {
@@ -447,8 +431,23 @@ div.popup {
     /* Enable vertical scrolling if needed */
 }
 
+div.vis-tooltip {
+    display: none !important;
+    background-color: #fff !important;
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+    max-width: 200px !important;
+    white-space: normal !important;
+    overflow: visible !important;
+}
 div.vis-tooltip b {
     color: #111;
+}
+div.vis-tooltip br {
+    display: block !important;
 }
 
 /* MODIFIED: Styles for <pre> elements within tooltips, to be Prism.js friendly */

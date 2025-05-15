@@ -93,17 +93,8 @@ def create_pyvis_figure(
 
         hover_text = (
             f"<b>{node_info['full_name']}</b><br>"
-            f"--------------------<br>"
             f"Type: {node_type}<br>"
-            f"Database: {node_info['database'] or '(default)'}<br>"
-            f"Connections: {node_degree}<br>"
-            f"--------------------<br>"
-            f"<b>Parents ({len(parents)}):</b><br>"
-            + ("<br>".join(f"  • {p}" for p in parents) if parents else "  (None)")
-            + "<br><br>"
-            + f"<b>Children ({len(children)}):</b><br>"
-            + ("<br>".join(f"  • {c}" for c in children) if children else "  (None)")
-            + (definition_html if node_definition else "")
+            f"Database: {node_info['database'] or '(default)'}"
         )
 
         # Add node to pyvis network

@@ -1,4 +1,13 @@
 ## Changelog
+### 0.2.2 (2025-05-15)
+- Refactor key bindings for navigation and update user prompts; enhance draw_pyvis_html function to return status
+- Implement feature X to enhance user experience and fix bug Y in module Z
+- Enhance node edit UI with improved commit button and warning area; remove deleted node styling in CSS
+- Refactor code structure for improved readability and maintainability
+- Add section for edits and drop script generation in wishes.md
+- Add 'dist/' to .gitignore to exclude distribution files
+- Update Python version requirement to 3.12 and enhance keywords in pyproject.toml; add missing __init__.py file
+
 ### 0.2.1 (2025-05-06)
 - Added MVP PostgreSQL parser for initial SQL dump support
 - Added option to omit edits from console output (enables integration with web/desktop app, "dataflow-app")

@@ -107,6 +107,9 @@ function onNetworkReady() {
 
             setupEventListeners(); // Setup all UI event listeners
             patchVisTooltip(); // Setup custom tooltips (from tooltips.js)
+            if (typeof initHoverTooltips === 'function') {
+                initHoverTooltips(network);
+            }
             listenersAttached = true;
             console.log("All event listeners and patches applied after network ready.");
         }
