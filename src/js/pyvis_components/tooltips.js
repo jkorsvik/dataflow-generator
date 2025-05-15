@@ -18,8 +18,6 @@ function makeDraggable(el) {
 
     function onMouseDown(e) {
         if (e.button !== 0 || e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
-        // e.preventDefault(); // Prevent default on header mousedown can sometimes interfere with input focus within tooltip
-        // e.stopPropagation(); // Let child elements handle their own clicks first
         isDragging = true;
         offsetX = e.clientX - el.getBoundingClientRect().left;
         offsetY = e.clientY - el.getBoundingClientRect().top;
@@ -29,7 +27,7 @@ function makeDraggable(el) {
 
     function onMouseMove(e) {
         if (!isDragging) return;
-        e.preventDefault(); // Prevent text selection during drag
+        e.preventDefault(); 
         let newLeft = e.clientX - offsetX;
         let newTop = e.clientY - offsetY;
         const elRect = el.getBoundingClientRect();
@@ -43,12 +41,10 @@ function makeDraggable(el) {
 
     function onMouseUp(e) {
         if (!isDragging) return;
-        // e.preventDefault(); // Not strictly necessary on mouseup
         isDragging = false;
         document.removeEventListener("mousemove", onMouseMove);
         document.removeEventListener("mouseup", onMouseUp);
     }
-
     header.addEventListener("mousedown", onMouseDown);
 }
 
@@ -68,7 +64,8 @@ function getCurrentChildIds(nodeId) {
     }).map(e => String(e.to));
 }
 
-function showPersistentTooltip(nodeId, htmlContent, event) {
+
+function showPersistentTooltip(nodeId, htmlContent, event) { // htmlContent is node.title
     hidePersistentTooltip();
 
     if (!window.network || !window.network.body || !window.network.body.data.nodes) {
@@ -88,21 +85,18 @@ function showPersistentTooltip(nodeId, htmlContent, event) {
     const allNodes = window.network.body.data.nodes.get({ returnType: 'Array' });
     const allNodeIds = allNodes.map(n => n.id);
 
-    Object.assign(nodeEditState, { // Use Object.assign to modify the global state object
+    Object.assign(nodeEditState, {
         nodeId: String(nodeId),
-        addParents: [],
-        addChildren: [],
-        removeParents: [],
-        removeChildren: [],
-        deleted: false,
+        addParents: [], addChildren: [], removeParents: [], removeChildren: [], deleted: false,
     });
-
 
     const otherNodeOptions = allNodeIds
         .filter(id => String(id) !== String(nodeId))
-        .map(id => `<option value="${id}">${id}</option>`) 
+        .map(id => `<option value="${id}">${id}</option>`)
         .join('');
 
+    // The 'htmlContent' (node.title) now includes the definition with pre/code tags.
+    // The editHtml is appended after this initial content.
     let editHtml = `
       <div class="custom-tooltip-section" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee;">
         <h4>Edit Node Connections</h4>
@@ -117,75 +111,70 @@ function showPersistentTooltip(nodeId, htmlContent, event) {
           <button class="tooltip-edit-button" data-action="add-child">Add</button>
         </div>
         <datalist id="allNodeList-${nodeId}">${otherNodeOptions}</datalist>
-  
-        <div class="tooltip-edit-group">
-          <strong>Current Parents:</strong> <span id="parentList-${nodeId}"></span>
-        </div>
-        <div class="tooltip-edit-group">
-          <strong>Current Children:</strong> <span id="childList-${nodeId}"></span>
-        </div>
-        <div class="tooltip-edit-group" style="margin-top:15px;">
-          <button class="tooltip-edit-button tooltip-delete-button" data-action="delete-node">Delete This Node</button>
-        </div>
+        <div class="tooltip-edit-group"><strong>Current Parents:</strong> <span id="parentList-${nodeId}"></span></div>
+        <div class="tooltip-edit-group"><strong>Current Children:</strong> <span id="childList-${nodeId}"></span></div>
+        <div class="tooltip-edit-group" style="margin-top:15px;"><button class="tooltip-edit-button tooltip-delete-button" data-action="delete-node">Delete This Node</button></div>
         <div id="editWarning-${nodeId}" class="tooltip-edit-warning" style="display:none;"></div>
-        <div style="margin-top:15px; text-align: right;">
-          <button id="commitNodeEditBtn-${nodeId}" class="tooltip-edit-button tooltip-commit-button" data-action="commit-node-edit" style="display:none;">Commit Changes</button>
-        </div>
+        <div style="margin-top:15px; text-align: right;"><button id="commitNodeEditBtn-${nodeId}" class="tooltip-edit-button tooltip-commit-button" data-action="commit-node-edit" style="display:none;">Commit Changes</button></div>
       </div>
     `;
 
-    const tooltipTitle = node.label || nodeId;
+    const tooltipTitle = node.label || nodeId; // Used for the header
+    
     persistentTooltip.innerHTML =
         `<div class="custom-persistent-tooltip-header">
-         <h3>${tooltipTitle}</h3>
-         <button class="custom-persistent-tooltip-close" title="Close (Esc)">×</button>
-       </div>
-       <div class="custom-persistent-tooltip-content">
-         <div class="custom-tooltip-section">${htmlContent}</div>
-         ${editHtml}
-       </div>`;
+           <h3>${tooltipTitle}</h3>
+           <button class="custom-persistent-tooltip-close" title="Close (Esc)">×</button>
+         </div>
+         <div class="custom-persistent-tooltip-content">
+           <div class="custom-tooltip-section">${htmlContent}</div> 
+           ${editHtml}
+         </div>`;
+         // htmlContent (which is node.title from Python) is placed here.
+         // It should now contain the definition block with <pre><code class="language-sql">...</code></pre>
 
     document.body.appendChild(persistentTooltip);
     persistentTooltipNodeId = String(nodeId);
-    
+
     const safeAddEventListener = (selector, eventType, handlerFn) => {
         const element = persistentTooltip.querySelector(selector);
-        if (element) {
-            // For onclick, direct assignment replaces previous, which is fine here
-            // as these are main action buttons.
-            element.onclick = handlerFn;
-        } else {
-            console.warn(`[DEBUG] safeAddEventListener: Element not found for selector "${selector}"`);
-        }
+        if (element) { element.onclick = handlerFn; }
+        else { console.warn(`[DEBUG] safeAddEventListener: Element not found for selector "${selector}" in persistent tooltip`); }
     };
 
     safeAddEventListener('.custom-persistent-tooltip-close', 'click', hidePersistentTooltip);
     safeAddEventListener('button[data-action="add-parent"]', 'click', handleNodeEditAction);
     safeAddEventListener('button[data-action="add-child"]', 'click', handleNodeEditAction);
-    safeAddEventListener('button[data-action="delete-node"]', 'click', handleNodeEditAction); // Initial assignment
+    safeAddEventListener('button[data-action="delete-node"]', 'click', handleNodeEditAction);
     safeAddEventListener(`#commitNodeEditBtn-${nodeId}`, 'click', handleNodeEditAction);
-
+    
+    const mainDeleteButton = persistentTooltip.querySelector('button[data-action="delete-node"]');
+    if (mainDeleteButton) { mainDeleteButton.onclick = handleNodeEditAction; }
 
     let x = event.clientX + 15;
     let y = event.clientY + 15;
     persistentTooltip.style.left = x + "px";
     persistentTooltip.style.top = y + "px";
-    makeDraggable(persistentTooltip); // THIS WAS THE MISSING FUNCTION
+    makeDraggable(persistentTooltip);
 
-    Promise.resolve().then(() => {
+    Promise.resolve().then(() => { /* Position adjustment code */
         const ttRect = persistentTooltip.getBoundingClientRect();
-        if (x + ttRect.width > window.innerWidth) {
-            x = Math.max(0, window.innerWidth - ttRect.width - 10);
-        }
-        if (y + ttRect.height > window.innerHeight) {
-            y = Math.max(0, window.innerHeight - ttRect.height - 10);
-        }
+        if (x + ttRect.width > window.innerWidth) x = Math.max(0, window.innerWidth - ttRect.width - 10);
+        if (y + ttRect.height > window.innerHeight) y = Math.max(0, window.innerHeight - ttRect.height - 10);
         persistentTooltip.style.left = x + "px";
         persistentTooltip.style.top = y + "px";
     });
 
-    if (window.Prism) {
-        Prism.highlightAllUnder(persistentTooltip.querySelector('.custom-persistent-tooltip-content'));
+    if (window.Prism && persistentTooltip) {
+        const contentArea = persistentTooltip.querySelector('.custom-persistent-tooltip-content');
+        if (contentArea) {
+            console.log("[DEBUG] Calling Prism.highlightAllUnder for persistent tooltip.");
+            Prism.highlightAllUnder(contentArea);
+        } else {
+            console.warn("[DEBUG] Persistent tooltip content area not found for Prism highlighting.");
+        }
+    } else {
+        console.warn("[DEBUG] Prism or persistentTooltip not available for highlighting.");
     }
     updateEditUI();
 }

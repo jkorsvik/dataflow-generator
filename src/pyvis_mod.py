@@ -1,3 +1,4 @@
+
 import os
 from pathlib import Path
 import re
@@ -6,19 +7,18 @@ from typing import List, Tuple, Dict, Optional, Union
 from pyvis.network import Network
 import json
 import textwrap
-import math  # For ceiling function
+import math
 import webbrowser
-import html # Added for HTML escaping
+import html
 
 def create_pyvis_figure(
-    graph: Union[nx.DiGraph, nx.Graph],  # DO NOT EDIT THIS LINE
+    graph: Union[nx.DiGraph, nx.Graph],
     node_types: Dict[str, Dict[str, str]],
     focus_nodes: List[str] = [],
     shake_towards_roots: bool = False,
 ) -> Tuple[Network, Dict]:
     """
     Creates the PyVis Network object and the initial options dictionary.
-    Uses the exact initial_options provided by the user.
     """
     nt = Network(
         height="100vh",
@@ -27,235 +27,144 @@ def create_pyvis_figure(
         bgcolor="#ffffff",
         font_color="#343434",
         heading="",
-        cdn_resources="in_line",  # Use 'local' if you want offline files
+        cdn_resources="in_line",
     )
 
-    # Calculate degrees for sizing
-    in_degrees = dict(graph.in_degree())  # type: ignore
-    out_degrees = dict(graph.out_degree())  # type: ignore
+    in_degrees = dict(graph.in_degree()) # type: ignore
+    out_degrees = dict(graph.out_degree()) # type: ignore
     degrees = {
         node: in_degrees.get(node, 0) + out_degrees.get(node, 0)
         for node in graph.nodes()
     }
     max_degree = max(degrees.values()) if degrees else 1
-    min_size, max_size = 15, 45  # Node size range
-    epsilon = 1e-6  # Small value to avoid division by zero
+    min_size, max_size = 15, 45
+    epsilon = 1e-6
     for node in graph.nodes():
         node_degree = degrees.get(node, 0)
-        # Scale size logarithmically or linearly - linear used here
         size = min_size + (node_degree / (max_degree + epsilon)) * (max_size - min_size)
-        # Ensure size doesn't exceed max_size (can happen if max_degree is 0)
         size = min(size, max_size)
 
-        # print(node, node_degree, size)  # Debugging output
-        # Get node info - use fallback if somehow missing (shouldn't happen)
         node_info = node_types.get(
             node, {"type": "unknown", "database": "", "full_name": node}
         )
-        node_type = node_info.get("type", "unknown")  # Use .get for safety
-        # print(node_info)  # Debugging output
-        # Color mapping
+        node_type = node_info.get("type", "unknown")
+        
         color_map = {
-            "view": "#4e79a7",  # Blue
-            "table": "#59a14f",  # Green
-            "cte_view": "#f9c846",  # Yellow for CTE views
-            "unknown": "#e15759",  # Red (Should be less common now)
-            "datamarket": "#ed7be7",  # Purple (Example)
-            "other": "#f28e2c",  # Orange (Example)
+            "view": "#4e79a7", "table": "#59a14f", "cte_view": "#f9c846",
+            "unknown": "#e15759", "datamarket": "#ed7be7", "other": "#f28e2c",
         }
-        color = color_map.get(node_type, "#bab0ab")  # Default grey for unmapped types
-
-        border_color = "#2b2b2b"  # Darker border
+        color = color_map.get(node_type, "#bab0ab")
+        border_color = "#2b2b2b"
         border_width = 1
         font_color = "#343434"
 
-        # Get parents and children from the graph
-        if not isinstance(graph, nx.DiGraph):
-            # If the graph is undirected, use neighbors as both parents and children
-            parents = sorted(list(graph.neighbors(node)))
-            children = sorted(list(graph.neighbors(node)))
-        elif isinstance(graph, nx.DiGraph):
-            # If the graph is directed, use predecessors and successors
-            parents = sorted(list(graph.predecessors(node)))
-            children = sorted(list(graph.successors(node)))
-
-        # Create hover text (tooltip) with definition as a styled card
+        # --- MODIFICATION FOR DEFINITION ---
         node_definition = node_info.get("definition")
-        definition_html = ""
+        definition_html_content = "" # Renamed to avoid conflict
         if node_definition:
             escaped_node_definition = html.escape(node_definition)
-            definition_html = (
-                f"<div style='margin-top:10px;'><b>Definition:</b>"
-                # The <pre> tag will now be styled by pyvis_styles.css to handle scrolling, padding, background (from Prism theme) etc.
-                f'<pre class="language-sql"><code class="language-sql">{escaped_node_definition}</code></pre>'
+            # Ensure the <pre> and <code> tags have the correct classes for Prism
+            definition_html_content = (
+                f"<div style='margin-top:10px; padding-top: 5px; border-top: 1px solid #eee;'><b>Definition:</b>"
+                f"<pre class='language-sql' style='max-height: 250px; overflow: auto;'><code class='language-sql'>{escaped_node_definition}</code></pre>"
                 f"</div>"
             )
 
-        hover_text = (
-            f"<b>{node_info['full_name']}</b><br>"
-            f"Type: {node_type}<br>"
-            f"Database: {node_info['database'] or '(default)'}"
+        # Base hover text (used by persistent tooltip AND potentially by hover if not fully hijacked)
+        base_hover_text = (
+            f"<b>{html.escape(node_info['full_name'])}</b><br>"
+            f"Type: {html.escape(node_type)}<br>"
+            f"Database: {html.escape(node_info['database'] or '(default)')}"
         )
 
-        # Add node to pyvis network
+        # Full title for persistent tooltip, including the definition
+        persistent_tooltip_html = base_hover_text + definition_html_content
+        
+        # Simple title for the native Vis.js hover (which Tippy will hijack)
+        # Keep this one brief. The persistent tooltip will show the full details.
+        simple_hover_title = base_hover_text 
+
         nt.add_node(
-            node,  # Node ID (base name)
-            label=node,  # Label displayed on the node
+            node,
+            label=node,
             color=color,
-            shape="dot",  # Circle shape
+            shape="dot",
             size=size,
             borderWidth=border_width,
             borderColor=border_color,
-            font={
-                "color": font_color,
-                "size": 12,
-                "strokeWidth": 0,  # No text stroke
-                # "strokeColor": "#ffffff", # Not needed if strokeWidth is 0
-                "align": "center",
-            },
-            title=hover_text,  # HTML tooltip content
-            mass=1 + node_degree / (max_degree + epsilon) * 2,  # Influence physics
-            fixed=False,  # Allow physics engine to move node
+            font={"color": font_color, "size": 12, "strokeWidth": 0, "align": "center"},
+            title=persistent_tooltip_html,  # This is for the persistent (onclick) tooltip
+            # Vis.js also has a 'hoverTitle' or uses 'title' for its native hover.
+            # If we want hover_tooltips.js to pick up a simpler title for the Tippy hover:
+            # We might need to adjust hover_tooltips.js to look for a custom attribute,
+            # or ensure the 'title' here is what we want Tippy to show.
+            # For now, persistent_tooltip_html is used by the click tooltip.
+            # hover_tooltips.js will also read this 'title' for the Tippy hover.
+            # If you want different content for hover vs click, that's a more complex change.
+            # Let's assume the base_hover_text (without definition) is fine for the quick hover.
+            # To make this distinction clear to hover_tooltips.js, we can set a specific attribute.
+            # OR, we can make `pyvis_styles.css` hide the definition part in the `.vis-tooltip`
+            # before `hover_tooltips.js` reads it.
+            # For simplicity now, the Tippy hover will show the same as the start of persistent (including definition).
+            # If you want the Tippy hover to be *only* base_hover_text, that's an enhancement for later.
+            mass=1 + node_degree / (max_degree + epsilon) * 2,
+            fixed=False,
         )
 
-    # Add edges to pyvis network
     for u, v in graph.edges():
-        if (
-            u in graph.nodes() and v in graph.nodes()
-        ):  # Ensure both nodes exist in the graph
+        if u in graph.nodes() and v in graph.nodes():
             nt.add_edge(
-                u,
-                v,
-                color={
-                    "color": "#cccccc",  # Light grey edge
-                    "opacity": 0.7,
-                    "highlight": "#e60049",  # Red highlight color
-                    "hover": "#e60049",  # Red hover color
-                },
-                width=1.5,  # Default edge width
-                hoverWidth=2.5,  # Width on hover
-                selectionWidth=2.5,  # Width when selected
-                # Smooth edges look better for hierarchical usually
-                smooth={
-                    "enabled": True,
-                    "type": "cubicBezier",
-                    "forceDirection": "vertical",  # Changed for better hierarchical flow sometimes
-                    "roundness": 0.4,
-                },
-                arrows={
-                    "to": {"enabled": True, "scaleFactor": 0.6}
-                },  # Arrow pointing to target
+                u, v,
+                color={"color": "#cccccc", "opacity": 0.7, "highlight": "#e60049", "hover": "#e60049"},
+                width=1.5, hoverWidth=2.5, selectionWidth=2.5,
+                smooth={"enabled": True, "type": "cubicBezier", "forceDirection": "vertical", "roundness": 0.4},
+                arrows={"to": {"enabled": True, "scaleFactor": 0.6}},
             )
-    # --- Use the EXACT Initial Pyvis options provided by the user ---
-    # <<< PASTE THE USER'S PROVIDED initial_options DICTIONARY HERE >>>
+
     initial_options = {
         "layout": {
             "hierarchical": {
-                "enabled": True,
-                "direction": "LR",
-                "sortMethod": "directed",
+                "enabled": True, "direction": "LR", "sortMethod": "directed",
                 "shakeTowards": "roots" if shake_towards_roots else "leaves",
-                "nodeSpacing": 1,
-                "treeSpacing": 200,
-                "levelSeparation": 300,
-                "blockShifting": True,
-                "edgeMinimization": True,
-                "parentCentralization": True,
+                "nodeSpacing": 1, "treeSpacing": 200, "levelSeparation": 300,
+                "blockShifting": True, "edgeMinimization": True, "parentCentralization": True,
             }
         },
         "interaction": {
-            "dragNodes": True,
-            "dragView": True,
-            "hover": True,
-            "hoverConnectedEdges": True,
-            "keyboard": {
-                "enabled": True,
-                "speed": {"x": 10, "y": 10, "zoom": 0.02},
-                "bindToWindow": True,
-            },
-            "multiselect": True,
-            "navigationButtons": False,
-            "selectable": True,
-            "selectConnectedEdges": True,
-            "tooltipDelay": 150,
+            "dragNodes": True, "dragView": True,
+            "hover": True,  # --- MODIFICATION: Enable hover by default ---
+            "hoverConnectedEdges": False, # Explicitly false for hover tooltips
+            "keyboard": {"enabled": True, "speed": {"x": 10, "y": 10, "zoom": 0.02}, "bindToWindow": True},
+            "multiselect": True, "navigationButtons": False, "selectable": True,
+            "selectConnectedEdges": True, "tooltipDelay": 150, # Vis.js native delay
             "zoomView": True,
         },
         "physics": {
-            "enabled": True,
-            "solver": "hierarchicalRepulsion",
-            "barnesHut": {
-                "gravitationalConstant": -2000,
-                "centralGravity": 0.3,
-                "springLength": 95,
-                "springConstant": 0.04,
-                "damping": 0.09,
-                "avoidOverlap": 0,
-            },
-            "forceAtlas2Based": {
-                "gravitationalConstant": -50,
-                "centralGravity": 0.01,
-                "springLength": 100,
-                "springConstant": 0.08,
-                "damping": 0.4,
-                "avoidOverlap": 0,
-            },
-            "hierarchicalRepulsion": {
-                "centralGravity": 0.3,
-                "springLength": 150,
-                "springConstant": 0.015,
-                "nodeDistance": 140,
-                "damping": 0.15,
-                "avoidOverlap": 1,
-            },
-            "repulsion": {
-                "centralGravity": 0.2,
-                "springLength": 200,
-                "springConstant": 0.05,
-                "nodeDistance": 100,
-                "damping": 0.09,
-            },
-            "stabilization": {
-                "enabled": True,
-                "iterations": 1000,
-                "updateInterval": 25,
-                "fit": True,
-            },
-            "adaptiveTimestep": True,
-            "minVelocity": 0.75,
-            "timestep": 0.5,
+            "enabled": True, "solver": "hierarchicalRepulsion",
+            "barnesHut": {"gravitationalConstant": -2000, "centralGravity": 0.3, "springLength": 95, "springConstant": 0.04, "damping": 0.09, "avoidOverlap": 0},
+            "forceAtlas2Based": {"gravitationalConstant": -50, "centralGravity": 0.01, "springLength": 100, "springConstant": 0.08, "damping": 0.4, "avoidOverlap": 0},
+            "hierarchicalRepulsion": {"centralGravity": 0.3, "springLength": 150, "springConstant": 0.015, "nodeDistance": 140, "damping": 0.15, "avoidOverlap": 1},
+            "repulsion": {"centralGravity": 0.2, "springLength": 200, "springConstant": 0.05, "nodeDistance": 100, "damping": 0.09},
+            "stabilization": {"enabled": True, "iterations": 1000, "updateInterval": 25, "fit": True},
+            "adaptiveTimestep": True, "minVelocity": 0.75, "timestep": 0.5,
         },
         "edges": {
             "arrows": {"to": {"enabled": True, "scaleFactor": 0.5}},
             "color": {"inherit": False},
-            "smooth": {
-                "enabled": True,
-                "type": "cubicBezier",
-                "forceDirection": "horizontal",
-                "roundness": 0.2,
-            },
-            "width": 1.5,
-            "selectionWidth": 2.5,
-            "hoverWidth": 2.5,
-            "widthConstraint": False,
+            "smooth": {"enabled": True, "type": "cubicBezier", "forceDirection": "horizontal", "roundness": 0.2},
+            "width": 1.5, "selectionWidth": 2.5, "hoverWidth": 2.5, "widthConstraint": False,
         },
         "nodes": {
-            "borderWidth": 1,
-            "borderWidthSelected": 3,
+            "borderWidth": 1, "borderWidthSelected": 3,
             "font": {"size": 12, "face": "arial", "color": "#343434"},
-            "scaling": {
-                "min": 10,
-                "max": 45,
-                "label": {"enabled": True, "min": 10, "max": 20},
-            },
-            "shape": "dot",
-            "shapeProperties": {"interpolation": False},
+            "scaling": {"min": 10, "max": 45, "label": {"enabled": True, "min": 10, "max": 20}},
+            "shape": "dot", "shapeProperties": {"interpolation": False},
             "shadow": {"enabled": False, "size": 10, "x": 5, "y": 5},
         },
     }
-    # <<< END OF PASTED DICTIONARY >>>
-
     nt.set_options(json.dumps(initial_options))
     return nt, initial_options
+
 
 def inject_controls_and_styles(
     html_content: str, initial_options: Dict, file_name: str = ""
