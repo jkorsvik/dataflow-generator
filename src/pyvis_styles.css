@@ -913,19 +913,35 @@ div.popup pre {
     min-height: 18px;
 }
 
-/* Deleted node styling */
-.deleted-node {
-    opacity: 0.4 !important;
-    position: relative;
+/* Deleted node visuals are now handled via vis.js node options and image overlays, not CSS classes. */
+
+/* Enhanced commit button and warning area for node edit UI */
+.tooltip-commit-button {
+    background: #D32F2F !important;
+    color: #fff !important;
+    font-weight: bold;
+    border: none;
+    box-shadow: 0 2px 8px rgba(211,47,47,0.15);
+    animation: pulseCommit 1.2s infinite;
+    transition: background 0.2s;
 }
-.deleted-node::after {
-    content: "❌";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 1.2em;
-    color: #D32F2F;
-    text-shadow: 0 0 2px rgba(0,0,0,0.3);
-    pointer-events: none;
+.tooltip-commit-button:hover {
+    background: #b71c1c !important;
+}
+@keyframes pulseCommit {
+    0% { box-shadow: 0 0 0 0 rgba(211,47,47,0.4); }
+    70% { box-shadow: 0 0 0 8px rgba(211,47,47,0.1); }
+    100% { box-shadow: 0 0 0 0 rgba(211,47,47,0.0); }
+}
+.tooltip-edit-warning {
+    background: #fff3e0;
+    color: #d84315;
+    border: 1px solid #ffccbc;
+    border-radius: 4px;
+    padding: 7px 12px;
+    margin-top: 10px;
+    font-weight: bold;
+    font-size: 13px;
+    box-shadow: 0 2px 8px rgba(255,152,0,0.08);
+    display: block;
 }

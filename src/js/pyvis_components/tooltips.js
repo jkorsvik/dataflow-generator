@@ -222,15 +222,37 @@ function handleNodeEditAction(event) {
         }
         case 'remove-parent': {
             const parentId = event.target.dataset.id;
-            if (!nodeEditState.removeParents.includes(parentId)) {
-                nodeEditState.removeParents.push(parentId);
+            const currentParents = getCurrentParentIds(nodeId);
+            if (parentId) {
+                // Removing a specific parent
+                if (!nodeEditState.removeParents.includes(parentId)) {
+                    nodeEditState.removeParents.push(parentId);
+                }
+            } else {
+                // Add all current parents to removal list
+                currentParents.forEach(pid => {
+                    if (!nodeEditState.removeParents.includes(pid)) {
+                        nodeEditState.removeParents.push(pid);
+                    }
+                });
             }
             break;
         }
         case 'remove-child': {
             const childId = event.target.dataset.id;
-            if (!nodeEditState.removeChildren.includes(childId)) {
-                nodeEditState.removeChildren.push(childId);
+            const currentChildren = getCurrentChildIds(nodeId);
+            if (childId) {
+                // Removing a specific child
+                if (!nodeEditState.removeChildren.includes(childId)) {
+                    nodeEditState.removeChildren.push(childId);
+                }
+            } else {
+                // Add all current children to removal list
+                currentChildren.forEach(cid => {
+                    if (!nodeEditState.removeChildren.includes(cid)) {
+                        nodeEditState.removeChildren.push(cid);
+                    }
+                });
             }
             break;
         }
@@ -284,28 +306,75 @@ function updateEditUI() {
     const commitBtn = document.getElementById(`commitNodeEditBtn-${nodeId}`);
     const editWarningEl = document.getElementById(`editWarning-${nodeId}`);
 
-    // Display current parents + pending removals
+    // Display current parents + pending removals/additions
     let parentHtml = '';
     const currentParents = getCurrentParentIds(nodeId);
+    const pendingAddParents = nodeEditState.addParents.filter(pid => !currentParents.includes(pid));
+    const pendingRemoveParents = nodeEditState.removeParents;
+
+    // Show current parents, mark those pending removal
     currentParents.forEach(pid => {
-        const isRemoving = nodeEditState.removeParents.includes(pid);
+        const isRemoving = pendingRemoveParents.includes(pid);
         parentHtml += `<span class="tooltip-chip ${isRemoving ? 'removing' : ''}" data-action="remove-parent" data-id="${pid}">${pid} <span class="chip-remove" title="Mark for removal">×</span></span> `;
+    });
+    // Show pending added parents (not yet in currentParents)
+    pendingAddParents.forEach(pid => {
+        parentHtml += `<span class="tooltip-chip adding" style="background:#e0ffe0;border:1px solid #388E3C;" title="Pending add">${pid} <span class="chip-remove" title="Undo add" data-action="undo-add-parent" data-id="${pid}">×</span></span> `;
     });
     if (parentListEl) parentListEl.innerHTML = parentHtml || '<i>None</i>';
 
-    // Display current children + pending removals
+    // Display current children + pending removals/additions
     let childHtml = '';
     const currentChildren = getCurrentChildIds(nodeId);
+    const pendingAddChildren = nodeEditState.addChildren.filter(cid => !currentChildren.includes(cid));
+    const pendingRemoveChildren = nodeEditState.removeChildren;
+
+    // Show current children, mark those pending removal
     currentChildren.forEach(cid => {
-        const isRemoving = nodeEditState.removeChildren.includes(cid);
+        const isRemoving = pendingRemoveChildren.includes(cid);
         childHtml += `<span class="tooltip-chip ${isRemoving ? 'removing' : ''}" data-action="remove-child" data-id="${cid}">${cid} <span class="chip-remove" title="Mark for removal">×</span></span> `;
+    });
+    // Show pending added children (not yet in currentChildren)
+    pendingAddChildren.forEach(cid => {
+        childHtml += `<span class="tooltip-chip adding" style="background:#e0ffe0;border:1px solid #388E3C;" title="Pending add">${cid} <span class="chip-remove" title="Undo add" data-action="undo-add-child" data-id="${cid}">×</span></span> `;
     });
     if (childListEl) childListEl.innerHTML = childHtml || '<i>None</i>';
 
-    // Add listeners to newly created chips for removal
+    // Add listeners to newly created chips for removal and undo add
+    persistentTooltip.querySelectorAll('.tooltip-chip[data-action="remove-parent"] .chip-remove').forEach(icon => {
+        icon.onclick = (e) => {
+            e.stopPropagation();
+            const parentId = icon.parentElement.parentElement.getAttribute('data-id');
+            handleNodeEditAction({ target: { dataset: { action: 'remove-parent', id: parentId } } });
+        };
+    });
+    persistentTooltip.querySelectorAll('.tooltip-chip[data-action="remove-child"] .chip-remove').forEach(icon => {
+        icon.onclick = (e) => {
+            e.stopPropagation();
+            const childId = icon.parentElement.parentElement.getAttribute('data-id');
+            handleNodeEditAction({ target: { dataset: { action: 'remove-child', id: childId } } });
+        };
+    });
+    // Undo pending add parent/child
+    persistentTooltip.querySelectorAll('.tooltip-chip.adding .chip-remove[data-action="undo-add-parent"]').forEach(icon => {
+        icon.onclick = (e) => {
+            e.stopPropagation();
+            const parentId = icon.parentElement.textContent.trim().split(' ')[0];
+            nodeEditState.addParents = nodeEditState.addParents.filter(pid => pid !== parentId);
+            updateEditUI();
+        };
+    });
+    persistentTooltip.querySelectorAll('.tooltip-chip.adding .chip-remove[data-action="undo-add-child"]').forEach(icon => {
+        icon.onclick = (e) => {
+            e.stopPropagation();
+            const childId = icon.parentElement.textContent.trim().split(' ')[0];
+            nodeEditState.addChildren = nodeEditState.addChildren.filter(cid => cid !== childId);
+            updateEditUI();
+        };
+    });
+    // Also keep the whole chip clickable for legacy support
     persistentTooltip.querySelectorAll('.tooltip-chip[data-action="remove-parent"]').forEach(chip => chip.onclick = handleNodeEditAction);
     persistentTooltip.querySelectorAll('.tooltip-chip[data-action="remove-child"]').forEach(chip => chip.onclick = handleNodeEditAction);
-
 
     // Show/hide commit button
     const hasChanges = nodeEditState.addParents.length > 0 ||
@@ -314,6 +383,72 @@ function updateEditUI() {
         nodeEditState.removeChildren.length > 0 ||
         nodeEditState.deleted;
     if (commitBtn) commitBtn.style.display = hasChanges ? 'inline-block' : 'none';
+
+    // Pending changes summary section
+    let pendingSummary = '';
+    if (hasChanges) {
+        pendingSummary += '<div class="tooltip-edit-group" style="margin-top:10px;"><strong>Pending Changes:</strong><ul style="margin:4px 0 0 18px;padding:0;">';
+        nodeEditState.addParents.forEach(pid => {
+            if (pid) pendingSummary += `<li style="color:#388E3C;">Add Parent: ${pid}</li>`;
+        });
+        nodeEditState.addChildren.forEach(cid => {
+            if (cid) pendingSummary += `<li style="color:#388E3C;">Add Child: ${cid}</li>`;
+        });
+        // Show removals
+        const currentParents = getCurrentParentIds(nodeId);
+        const currentChildren = getCurrentChildIds(nodeId);
+        nodeEditState.removeParents.forEach(pid => {
+            if (currentParents.includes(pid)) {
+                pendingSummary += `<li style="color:#D32F2F;">Remove Parent: ${pid}</li>`;
+            }
+        });
+        nodeEditState.removeChildren.forEach(cid => {
+            if (currentChildren.includes(cid)) {
+                pendingSummary += `<li style="color:#D32F2F;">Remove Child: ${cid}</li>`;
+            }
+        });
+        if (nodeEditState.deleted) {
+            pendingSummary += `<li style="color:#D32F2F;">Node marked for deletion</li>`;
+        }
+        pendingSummary += '</ul></div>';
+    }
+    // Insert or update the pending changes summary in the tooltip
+    let summaryDiv = persistentTooltip.querySelector('.tooltip-pending-summary');
+    if (!summaryDiv) {
+        summaryDiv = document.createElement('div');
+        summaryDiv.className = 'tooltip-pending-summary';
+        const contentDiv = persistentTooltip.querySelector('.custom-persistent-tooltip-content');
+        if (contentDiv) contentDiv.appendChild(summaryDiv);
+    }
+    summaryDiv.innerHTML = pendingSummary;
+
+    // Log pending changes summary to console
+    if (hasChanges) {
+        let summaryLog = `[NODE EDIT] Pending changes for node ${nodeId}:`;
+        nodeEditState.addParents.forEach(pid => {
+            if (pid) summaryLog += `\n  + Parent: ${pid}`;
+        });
+        nodeEditState.addChildren.forEach(cid => {
+            if (cid) summaryLog += `\n  + Child: ${cid}`;
+        });
+        // Show removals for existing connections only
+        const currentParents = getCurrentParentIds(nodeId);
+        const currentChildren = getCurrentChildIds(nodeId);
+        nodeEditState.removeParents.forEach(pid => {
+            if (currentParents.includes(pid)) {
+                summaryLog += `\n  - Parent: ${pid}`;
+            }
+        });
+        nodeEditState.removeChildren.forEach(cid => {
+            if (currentChildren.includes(cid)) {
+                summaryLog += `\n  - Child: ${cid}`;
+            }
+        });
+        if (nodeEditState.deleted) {
+            summaryLog += `\n  [Node marked for deletion]`;
+        }
+        console.log('%c' + summaryLog, 'color: #5C6BC0; background: #E8EAF6; font-weight: bold; font-size: 13px; padding: 2px 8px;');
+    }
 
     // Handle "deleted" state
     const contentDiv = persistentTooltip.querySelector('.custom-persistent-tooltip-content');
@@ -358,11 +493,36 @@ function commitNodeChanges() {
     // Basic validation: prevent adding self as parent/child (already handled in add logic)
     // Prevent adding a non-existent node (already handled in add logic)
 
-    console.log('[NODE_EDIT_COMMIT]', JSON.stringify(changes));
-    // Here, you would typically send this to a backend or update the vis.js network directly.
-    // For this example, we just log it.
-    // If updating vis.js directly:
-    // applyDirectNetworkChanges(changes);
+    // --- SHOUT OUT NODE EDITS TO CONSOLE ---
+    if (changes.deleted) {
+        console.log(
+            '%c[NODE EDIT COMMIT] Node deleted: ' + changes.nodeId,
+            'color: #fff; background: #C62828; font-weight: bold; font-size: 16px; padding: 2px 8px; border-radius: 2px;'
+        );
+    } else if (
+        changes.addParents.length > 0 ||
+        changes.addChildren.length > 0 ||
+        changes.removeParents.length > 0 ||
+        changes.removeChildren.length > 0
+    ) {
+        let msg = `[NODE EDIT COMMIT] Changes for node ${changes.nodeId}:`;
+        if (changes.addParents.length > 0) msg += `\n  + Parents: ${changes.addParents.join(', ')}`;
+        if (changes.addChildren.length > 0) msg += `\n  + Children: ${changes.addChildren.join(', ')}`;
+        if (changes.removeParents.length > 0) msg += `\n  - Parents: ${changes.removeParents.join(', ')}`;
+        if (changes.removeChildren.length > 0) msg += `\n  - Children: ${changes.removeChildren.join(', ')}`;
+        console.log(
+            '%c' + msg,
+            'color: #fff; background: #F57C00; font-weight: bold; font-size: 15px; padding: 2px 8px; border-radius: 2px;'
+        );
+    } else {
+        console.log(
+            '%c[NODE EDIT COMMIT] Node restored: ' + changes.nodeId,
+            'color: #fff; background: #2E7D32; font-weight: bold; font-size: 15px; padding: 2px 8px; border-radius: 2px;'
+        );
+    }
+
+    // --- Apply changes to vis.js DataSets ---
+    applyDirectNetworkChanges(changes);
 
     // --- Apply visual updates to the node on the client-side after commit ---
     if (window.network && window.network.body && window.network.body.data && window.network.body.data.nodes) {
@@ -384,55 +544,71 @@ function commitNodeChanges() {
             if (nodeObject.options.originalFont === undefined) {
                 nodeObject.options.originalFont = JSON.parse(JSON.stringify(nodeObject.options.font || {}));
             }
-             if (nodeObject.options.originalOpacity === undefined) {
+            if (nodeObject.options.originalOpacity === undefined) {
                 nodeObject.options.originalOpacity = nodeObject.options.opacity !== undefined ? nodeObject.options.opacity : 1.0;
+            }
+            // Store original shape and image for proper reset
+            if (nodeObject.options.originalShape === undefined) {
+                nodeObject.options.originalShape = nodeObject.options.shape || "ellipse";
+            }
+            if (nodeObject.options.originalImage === undefined && nodeObject.options.image !== undefined) {
+                nodeObject.options.originalImage = nodeObject.options.image;
             }
 
 
             if (changes.deleted) {
                 updateOptions = {
-                    // id: nodeIdToUpdate, // ID is not needed for setOptions on the object itself
-                    label: "❌ " + originalLabel,
-                    opacity: 0.4, // Dim the node more significantly
-                    color: { // Specific colors for deleted state
-                        background: '#E0E0E0', // Light gray background
-                        border: '#D32F2F',     // Darker Red border
+                    shape: "image",
+                    image: "https://cdn-icons-png.flaticon.com/512/1828/1828665.png",
+                    imagePadding: { top: 0, bottom: 10, left: 0, right: 0 },
+                    imageAlignment: "top",
+                    label: originalLabel,
+                    opacity: 0.4,
+                    font: { color: '#D32F2F' },
+                    color: {
+                        background: '#E0E0E0',
+                        border: '#D32F2F',
                         highlight: {
                             background: '#EEEEEE',
                             border: '#D32F2F'
                         }
-                    },
-                    font: { color: '#D32F2F' } // Darker Red text for the label
+                    }
                 };
             } else if (changes.addParents.length > 0 || changes.addChildren.length > 0 || changes.removeParents.length > 0 || changes.removeChildren.length > 0) {
                 updateOptions = {
-                    // id: nodeIdToUpdate,
-                    label: originalLabel, // Keep original label (without cross)
-                    opacity: 0.75, // Slightly dim for modification
+                    label: originalLabel,
+                    opacity: 0.75,
                     color: {
-                        ...(nodeObject.options.originalColor || {}), // Start with original/default colors
-                        border: '#FF8F00', // Bright Orange border for modification
+                        ...(nodeObject.options.originalColor || {}),
+                        border: '#FF8F00',
                         highlight: {
-                             ...(nodeObject.options.originalColor?.highlight || {}),
+                            ...(nodeObject.options.originalColor?.highlight || {}),
                             border: '#FF8F00'
                         }
                     },
-                    font: { ...(nodeObject.options.originalFont || {}), color: (nodeObject.options.originalFont?.color || '#343434') } // Reset font color
+                    font: { ...(nodeObject.options.originalFont || {}), color: (nodeObject.options.originalFont?.color || '#343434') }
                 };
             } else {
                  // No structural changes, or an "undo delete" without other changes. Reset to original appearance.
                 updateOptions = {
-                    // id: nodeIdToUpdate,
-                    label: originalLabel, // Ensure no "❌ "
+                    label: originalLabel,
                     opacity: nodeObject.options.originalOpacity !== undefined ? nodeObject.options.originalOpacity : 1.0,
-                    color: JSON.parse(JSON.stringify(nodeObject.options.originalColor || {})), // Deep copy to restore
-                    font: JSON.parse(JSON.stringify(nodeObject.options.originalFont || {}))   // Deep copy to restore
+                    color: JSON.parse(JSON.stringify(nodeObject.options.originalColor || {})),
+                    font: JSON.parse(JSON.stringify(nodeObject.options.originalFont || {})),
+                    shape: nodeObject.options.originalShape || "ellipse",
+                    image: nodeObject.options.originalImage || undefined,
+                    imagePadding: undefined,
+                    imageAlignment: undefined
                 };
             }
 
             if (Object.keys(updateOptions).length > 0) {
                 nodeObject.setOptions(updateOptions);
-                console.log(`Visual update applied to node ${nodeIdToUpdate}:`, JSON.stringify(updateOptions));
+                // Shout out visual update
+                console.log(
+                    '%c[VISUAL UPDATE] Node ' + nodeIdToUpdate + ' updated.',
+                    'color: #fff; background: #1565C0; font-weight: bold; font-size: 13px; padding: 2px 8px; border-radius: 2px;'
+                );
                 // window.network.redraw(); // May not be needed if setOptions triggers redraw
             }
         } else {
@@ -443,6 +619,49 @@ function commitNodeChanges() {
 
     hidePersistentTooltip(); // Close tooltip after committing
     // Optionally, re-select the node or refresh parts of the graph if changes were applied locally
+}
+// Apply changes directly to vis.js DataSets (client-side only)
+function applyDirectNetworkChanges(changes) {
+  if (!window.network) return;
+  const { nodeId, addParents, addChildren, removeParents, removeChildren, deleted } = changes;
+  const edgesDataSet = window.network.body.data.edges;
+  const nodesDataSet = window.network.body.data.nodes;
+
+  if (deleted) {
+    try { 
+      // Remove all edges connected to this node
+      const connectedEdges = edgesDataSet.get({
+        filter: e => e.from === nodeId || e.to === nodeId
+      });
+      if (connectedEdges.length) edgesDataSet.remove(connectedEdges.map(e => e.id));
+      nodesDataSet.remove(nodeId); 
+    } catch (e) { 
+      console.warn("Error removing node:", e); 
+    }
+  } else {
+    addParents.forEach(parentId => {
+      if (nodesDataSet.get(parentId)) { // Check if parent node exists
+        edgesDataSet.add({ from: parentId, to: nodeId, arrows: 'to' });
+      }
+    });
+    addChildren.forEach(childId => {
+      if (nodesDataSet.get(childId)) { // Check if child node exists
+        edgesDataSet.add({ from: nodeId, to: childId, arrows: 'to' });
+      }
+    });
+    removeParents.forEach(parentId => {
+      const edges = edgesDataSet.get({
+        filter: e => String(e.from) === String(parentId) && String(e.to) === String(nodeId)
+      });
+      if (edges.length) edgesDataSet.remove(edges.map(e => e.id));
+    });
+    removeChildren.forEach(childId => {
+      const edges = edgesDataSet.get({
+        filter: e => String(e.from) === String(nodeId) && String(e.to) === String(childId)
+      });
+      if (edges.length) edgesDataSet.remove(edges.map(e => e.id));
+    });
+  }
 }
 
 // Example of how one might apply changes directly (for client-side only demo)
