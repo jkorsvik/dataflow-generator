@@ -204,23 +204,234 @@ def inject_controls_and_styles(
         print(f"Warning: pyvis_styles.css not found at {css_path}")
     custom_css = f'<style type="text/css">\n{css_content}\n</style>'
 
-    # --- 2. Custom HTML (controls/legend/search panel etc.) ---
-    # (Your existing create_control function and HTML structure for panels)
-    # This function needs to be defined or imported if it's substantial
-    # For brevity, assuming it's similar to your previous versions.
-    # Make sure the HTML for controlPanel, legend, modals, searchIcon, searchPanel, selectionOverlay
-    # is correctly generated here.
-    
-    # Placeholder for your extensive HTML generation logic
-    # custom_html_elements = "<div>Your controls and other HTML elements here</div>"
-    # This part is from your original pyvis_mod.py. Ensure it is complete and correct.
-    # For this example, I will use a simplified version, assuming the one you have is correct.
-    def create_control_placeholder(key_path, config_val_accessor): return f"<div>Control for {key_path}</div>"
-    physics_controls = [create_control_placeholder(k, initial_options) for k in ["physics.enabled", "physics.solver"]] # simplified
-    layout_controls = [create_control_placeholder(k, initial_options) for k in ["layout.hierarchical.enabled", "layout.hierarchical.direction"]] # simplified
-    interaction_controls = [create_control_placeholder(k, initial_options) for k in ["interaction.dragNodes", "interaction.tooltipDelay"]] # simplified
-    edge_controls = [create_control_placeholder(k, initial_options) for k in ["edges.smooth.enabled", "edges.smooth.type"]] # simplified
-    node_controls = [create_control_placeholder(k, initial_options) for k in ["nodes.font.size", "nodes.shape"]] # simplified
+    def create_control(key_path, config):
+        label_text = key_path.split(".")[-1].replace("_", " ").title()
+        html = f'<div class="control-item" id="ctrl_{key_path.replace(".", "_")}">'
+        html += f'<label for="{key_path}" title="{key_path}">{label_text}</label>'
+        value = initial_options
+        try:
+            for k in key_path.split("."):
+                value = value[k]
+        except KeyError:
+            print(f"Warning: Initial option key not found: {key_path}")
+            value = None
+        if isinstance(value, bool):
+            html = (
+                f'<div class="switch-container" id="ctrl_{key_path.replace(".", "_")}">'
+                f'<label for="{key_path}" class="text-label" title="{key_path}">{label_text}</label>'
+                f'<label class="switch"><input type="checkbox" id="{key_path}" {"checked" if value else ""}> <span class="slider"></span></label>'
+            )
+        elif key_path == "physics.solver":
+            options = [
+                "barnesHut",
+                "forceAtlas2Based",
+                "hierarchicalRepulsion",
+                "repulsion",
+            ]
+            opts_html = "".join(
+                [
+                    f'<option value="{o}" {"selected" if value == o else ""}>{o}</option>'
+                    for o in options
+                ]
+            )
+            html += f'<select id="{key_path}">{opts_html}</select>'
+        elif key_path == "layout.hierarchical.direction":
+            options = ["LR", "RL", "UD", "DU"]
+            opts_html = "".join(
+                [
+                    f'<option value="{o}" {"selected" if value == o else ""}>{o}</option>'
+                    for o in options
+                ]
+            )
+            html += f'<select id="{key_path}">{opts_html}</select>'
+        elif key_path == "layout.hierarchical.sortMethod":
+            options = ["hubsize", "directed"]
+            opts_html = "".join(
+                [
+                    f'<option value="{o}" {"selected" if value == o else ""}>{o}</option>'
+                    for o in options
+                ]
+            )
+            html += f'<select id="{key_path}">{opts_html}</select>'
+        elif key_path == "edges.smooth.type":
+            options = [
+                "dynamic",
+                "continuous",
+                "discrete",
+                "diagonalCross",
+                "horizontal",
+                "vertical",
+                "curvedCW",
+                "curvedCCW",
+                "cubicBezier",
+            ]
+            opts_html = "".join(
+                [
+                    f'<option value="{o}" {"selected" if value == o else ""}>{o}</option>'
+                    for o in options
+                ]
+            )
+            html += f'<select id="{key_path}">{opts_html}</select>'
+        elif key_path == "nodes.shape":
+            options = [
+                "ellipse",
+                "circle",
+                "database",
+                "box",
+                "text",
+                "diamond",
+                "dot",
+                "star",
+                "triangle",
+                "triangleDown",
+                "square",
+            ]
+            opts_html = "".join(
+                [
+                    f'<option value="{o}" {"selected" if value == o else ""}>{o}</option>'
+                    for o in options
+                ]
+            )
+            html += f'<select id="{key_path}">{opts_html}</select>'
+        elif key_path == "physics.hierarchicalRepulsion.avoidOverlap":
+            # Always render avoidOverlap as a slider with min=0, max=1, step=0.01
+            html += (
+                f'<input type="range" id="{key_path}" min="0" max="1" step="0.01" value="{value}">'
+                f'<span class="value-display" id="{key_path}_value">{value:.2f}</span>'
+            )
+        elif key_path == "nodes.size":
+            # Add a slider for node size with a reasonable range
+            html += (
+                f'<input type="range" id="{key_path}" min="5" max="100" step="1" value="{value}">'
+                f'<span class="value-display" id="{key_path}_value">{value}</span>'
+            )
+        elif key_path == "nodes.scaling.min":
+            html += (
+                f'<input type="range" id="{key_path}" min="1" max="100" step="1" value="{value}">'
+                f'<span class="value-display" id="{key_path}_value">{value}</span>'
+            )
+        elif key_path == "nodes.scaling.max":
+            html += (
+                f'<input type="range" id="{key_path}" min="1" max="1000" step="1" value="{value}">'
+                f'<span class="value-display" id="{key_path}_value">{value}</span>'
+            )
+        elif isinstance(value, (int, float)):
+            if (
+                "delay" in key_path.lower()
+                or "iteration" in key_path.lower()
+                or "velocity" in key_path.lower()
+                or "timestep" in key_path.lower()
+                or "constant" in key_path.lower()
+                or "factor" in key_path.lower()
+                or "size" in key_path.lower()
+                or "width" in key_path.lower()
+            ):
+                step = (
+                    0.01
+                    if isinstance(value, float) and value < 5
+                    else (0.1 if isinstance(value, float) else 1)
+                )
+                min_val, max_val = 0, 1000  # Simplified range detection
+                if "delay" in key_path.lower():
+                    max_val = 2000
+                elif "iteration" in key_path.lower():
+                    max_val = 5000
+                elif "factor" in key_path.lower():
+                    max_val = 2
+                elif "size" in key_path.lower() or "width" in key_path.lower():
+                    max_val = 50
+                elif value <= 1:
+                    max_val = 1
+                elif value > 0:
+                    max_val = value * 3
+                html += f'<input type="number" id="{key_path}" value="{value}" step="{step}" min="{min_val}">'
+            else:
+                step = (
+                    0.01
+                    if isinstance(value, float) and value < 1
+                    else (0.1 if isinstance(value, float) else 10)
+                )
+                min_val = 0 if "damping" not in key_path.lower() else 0.05
+                max_val = (
+                    1
+                    if "damping" in key_path.lower()
+                    or "overlap" in key_path.lower()
+                    or "gravity" in key_path.lower()
+                    else 1000
+                )
+                html += f'<input type="range" id="{key_path}" min="{min_val}" max="{max_val}" step="{step}" value="{value}">'
+                html += (
+                    f'<span class="value-display" id="{key_path}_value">{value:.2f}</span>'
+                    if isinstance(value, float)
+                    else f'<span class="value-display" id="{key_path}_value">{value}</span>'
+                )
+        else:
+            html += f'<input type="text" id="{key_path}" value="{value if value is not None else ""}">'
+        html += "</div>"
+        return html
+
+    physics_controls = [
+        create_control(k, initial_options)
+        for k in [
+            "physics.enabled",
+            "physics.solver",
+            "physics.hierarchicalRepulsion.nodeDistance",
+            "physics.hierarchicalRepulsion.centralGravity",
+            "physics.hierarchicalRepulsion.springLength",
+            "physics.hierarchicalRepulsion.springConstant",
+            "physics.hierarchicalRepulsion.damping",
+            "physics.hierarchicalRepulsion.avoidOverlap",
+            "physics.minVelocity",
+            "physics.timestep",
+        ]
+    ]
+    layout_controls = [
+        create_control(k, initial_options)
+        for k in [
+            "layout.hierarchical.enabled",
+            "layout.hierarchical.direction",
+            "layout.hierarchical.sortMethod",
+            "layout.hierarchical.levelSeparation",
+            "layout.hierarchical.nodeSpacing",
+            "layout.hierarchical.treeSpacing",
+        ]
+    ]
+    interaction_controls = [
+        create_control(k, initial_options)
+        for k in [
+            "interaction.dragNodes",
+            "interaction.dragView",
+            "interaction.hover",
+            "interaction.hoverConnectedEdges",
+            "interaction.keyboard.enabled",
+            "interaction.multiselect",
+            "interaction.selectable",
+            "interaction.selectConnectedEdges",
+            "interaction.tooltipDelay",
+            "interaction.zoomView",
+        ]
+    ]
+    edge_controls = [
+        create_control(k, initial_options)
+        for k in [
+            "edges.smooth.enabled",
+            "edges.smooth.type",
+            "edges.smooth.roundness",
+            "edges.arrows.to.enabled",
+            "edges.arrows.to.scaleFactor",
+        ]
+    ]
+    node_controls = [
+        create_control(k, initial_options)
+        for k in [
+            "nodes.scaling.min",
+            "nodes.scaling.max",
+            "nodes.scaling.label.enabled",
+            "nodes.font.size",
+            "nodes.shape",
+            "nodes.shadow.enabled",
+        ]
+    ]
 
     custom_html_elements = textwrap.dedent(f"""
     <div id="loadingOverlay"><div class="spinner"></div><div>Processing...</div></div>
