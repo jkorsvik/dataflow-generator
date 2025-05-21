@@ -6,8 +6,9 @@
  - Make sure the search is case insensitive
 
 
+## EDITS AND GENERETA DROP SCRIPT BASED ON EDITS
+- update html graph with the edits, shout out the edits
 
-# Remove flatten as a dbobject
- - remove "FLATTEN" as a dbobject
- - it is a keyword before referencing a dbobject
+## return html to the user
+- return the html to the user
 

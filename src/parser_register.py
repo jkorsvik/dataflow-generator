@@ -4,7 +4,7 @@ import re
 from typing import Optional, Union
 from sqlfluff.core import Linter
 
-from src.parsers import (
+from .parsers import (
     parser_denodo,
     parser_mysql,
     parser_postgres,

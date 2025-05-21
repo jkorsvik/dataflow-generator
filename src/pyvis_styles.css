@@ -1,0 +1,306 @@
+/* pyvis_styles.css */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css');
+
+html,
+body {
+    height: 100vh;
+    min-height: 1150px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    font-family: sans-serif;
+}
+
+#mynetwork {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    transition: right 0.3s ease;
+    border: 1px solid lightgray;
+    min-height: 1140px;
+    height: 99vh;
+    width: 100%;
+    background-color: #ffffff;
+}
+
+.vis-network {
+    outline: none;
+    height: 100% !important;
+    width: 100% !important;
+}
+
+#loadingBar {
+    opacity: 0.35; /* Or display: none; if preferred, but JS also handles it */
+}
+
+.control-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: 300px;
+    background: rgba(248, 248, 248, 0.98);
+    box-shadow: -3px 0 8px rgba(0, 0, 0, 0.15);
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    z-index: 1001;
+    font-size: 13px;
+    color: #333;
+    display: flex;
+    flex-direction: column;
+}
+
+.control-panel.expanded {
+    transform: translateX(0);
+}
+
+.panel-tab {
+    position: absolute;
+    left: -40px;
+    top: 40px;
+    width: 40px;
+    height: 40px;
+    background: rgba(248, 248, 248, 0.9);
+    border-radius: 8px 0 0 8px;
+    box-shadow: -2px 2px 6px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #555;
+    border: 1px solid #ddd;
+    border-right: none;
+}
+
+.panel-tab:hover {
+    background-color: #eee;
+}
+
+.panel-tab i {
+    transition: transform 0.3s ease;
+}
+
+.panel-tab .hamburger-icon {
+    width: 20px;
+    height: 16px;
+    position: relative;
+    margin: 0 auto;
+}
+
+.panel-tab .hamburger-icon span {
+    display: block;
+    position: absolute;
+    height: 2px;
+    width: 100%;
+    background: #555;
+    border-radius: 2px;
+    opacity: 1;
+    left: 0;
+    transform: rotate(0deg);
+    transition: .25s ease-in-out;
+}
+
+.panel-tab .hamburger-icon span:nth-child(1) { top: 0px; }
+.panel-tab .hamburger-icon span:nth-child(2) { top: 7px; }
+.panel-tab .hamburger-icon span:nth-child(3) { top: 14px; }
+
+.control-panel.expanded .panel-tab .hamburger-icon span:nth-child(1) { top: 7px; transform: rotate(135deg); }
+.control-panel.expanded .panel-tab .hamburger-icon span:nth-child(2) { opacity: 0; left: -60px; }
+.control-panel.expanded .panel-tab .hamburger-icon span:nth-child(3) { top: 7px; transform: rotate(-135deg); }
+
+.panel-header {
+    padding: 10px 15px;
+    border-bottom: 1px solid #ddd;
+    font-weight: bold;
+    font-size: 15px;
+    color: #444;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.panel-content { padding: 10px 15px; flex-grow: 1; overflow-y: auto; }
+.control-group { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dotted #ccc; }
+.control-group:last-child { border-bottom: none; }
+.control-group h3 { margin: 0 0 10px; font-size: 12px; color: #666; text-transform: uppercase; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+.control-item { margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; }
+.control-item label, .control-item span { font-size: 12px; color: #444; margin-right: 6px; flex-shrink: 0; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.control-item select, .control-item input[type="number"], .control-item input[type="range"] { flex-grow: 1; padding: 4px 6px; font-size: 12px; border: 1px solid #ccc; border-radius: 3px; max-width: 150px; box-sizing: border-box; }
+.control-item input[type="range"] { padding: 0; height: 18px; }
+.control-item .value-display { font-size: 11px; color: #777; min-width: 30px; text-align: right; }
+.control-button { display: block; width: 100%; padding: 8px 10px; margin: 8px 0; background-color: #007bff; color: white; border: none; border-radius: 4px; text-align: center; cursor: pointer; font-size: 14px; transition: background-color 0.2s ease; }
+.control-button:hover { background-color: #0056b3; }
+.control-button.secondary { background-color: #6c757d; }
+.control-button.secondary:hover { background-color: #5a6268; }
+.control-button i { margin-right: 8px; }
+.switch-container { display: flex; align-items: center; justify-content: space-between; margin: 5px 0; }
+.switch-container label.text-label { font-size: 12px; color: #444; margin-right: 10px; }
+.switch { position: relative; display: inline-block; width: 38px; height: 20px; flex-shrink: 0; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .3s; border-radius: 20px; }
+.slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+input:checked+.slider { background-color: #66bb6a; }
+input:checked+.slider:before { transform: translateX(18px); }
+
+.legend { position: absolute; bottom: 15px; left: 15px; background: rgba(255, 255, 255, 0.9); padding: 10px 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15); z-index: 1000; }
+.legend-item { display: flex; align-items: center; margin-bottom: 6px; }
+.legend-item:last-child { margin-bottom: 0; }
+.legend-color { width: 15px; height: 15px; margin-right: 8px; border-radius: 3px; border: 1px solid #ccc; }
+.legend-label { font-size: 13px; color: #555; }
+
+.custom-persistent-tooltip { display: flex; flex-direction: column; font-family: Arial, sans-serif; position: fixed; white-space: normal; padding: 0; background-color: #f9f9f9; border: 1px solid #ddd; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15); border-radius: 6px; min-width: 300px; max-width: 60vw; min-height: 200px; max-height: 80vh; color: #333; font-size: 13px; line-height: 1.4; overflow: hidden; resize: both; z-index: 10000; /* Increased z-index */ }
+.custom-persistent-tooltip-header { padding: 8px 12px; background-color: #f0f0f0; border-bottom: 1px solid #ddd; cursor: move; user-select: none; display: flex; justify-content: space-between; align-items: center; border-radius: 6px 6px 0 0; }
+.custom-persistent-tooltip-header h3 { margin: 0; font-size: 14px; font-weight: 600; color: #444; }
+.custom-persistent-tooltip-close { background: none; border: none; color: #666; cursor: pointer; padding: 4px 8px; font-size: 16px; border-radius: 4px; }
+.custom-persistent-tooltip-close:hover { background-color: rgba(0, 0, 0, 0.05); color: #333; }
+.custom-persistent-tooltip-content { padding: 12px; overflow: auto; max-height: calc(80vh - 37px); /* 37px for header */ }
+
+/* --- MODIFICATION FOR HOVER TOOLTIP --- */
+/* Let JS control the native vis.js tooltip completely for hover hijacking */
+div.vis-tooltip {
+    /* visibility: hidden !important; */ /* REMOVED !important, JS will handle it */
+    /* The following styles make it non-intrusive if JS fails or before it acts */
+    opacity: 0;
+    pointer-events: none;
+    position: absolute !important; /* Ensure it can be moved off-screen */
+    left: -9999px !important;
+    top: -9999px !important;
+    padding: 4px 8px !important; /* Keep some base styling for content measurement if needed */
+    font-size: 12px !important;
+    background-color: #fff !important; /* Must have a background for content reading */
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+    line-height: 1.2 !important;
+    max-width: 300px !important; /* Reasonable max-width for content reading */
+    white-space: normal !important;
+    z-index: 1; /* Keep it behind our custom tooltips */
+}
+div.vis-tooltip b { color: #111; }
+div.vis-tooltip br { display: block !important; }
+
+/* --- TIPPY OVERWRITES (ensure it's above persistent tooltip if both are somehow active) --- */
+.tippy-box {
+    z-index: 10010 !important; /* Higher than persistent tooltip */
+    font-size: 12px; /* Make Tippy hover a bit smaller */
+    line-height: 1.3;
+}
+.tippy-box[data-theme~='light-border'] { /* Default theme from hover_tooltips.js */
+    box-shadow: 0 0 8px rgba(0,0,0,0.15);
+}
+
+
+/* --- STYLING FOR PRISM.JS CODE BLOCKS IN PERSISTENT TOOLTIP --- */
+.custom-persistent-tooltip .custom-persistent-tooltip-content pre[class*="language-"] {
+    /* Prism themes usually set their own background, color, font-family, padding, margin. */
+    /* We primarily focus on layout here. */
+    border-radius: 4px;
+    max-height: 300px; /* Max height for the code block */
+    overflow: auto !important; /* Ensure scrollbars for overflow, !important if Prism overrides */
+    font-size: 12px; /* Slightly smaller font for code */
+    line-height: 1.4; /* Adjust line height for readability */
+    /* border: 1px solid #ddd; */ /* Optional: Prism themes usually provide a border or it's part of the theme */
+}
+
+/* Ensure code tag inside pre also behaves well */
+.custom-persistent-tooltip .custom-persistent-tooltip-content pre[class*="language-"] code[class*="language-"] {
+    white-space: pre-wrap !important;   /* Allow wrapping of long lines inside code block */
+    word-wrap: break-word !important;   /* Break words if they are too long */
+    display: block;             /* Ensures the code block takes up the pre's width */
+}
+
+
+#loadingOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(200, 200, 200, 0.6); z-index: 10002; display: none; justify-content: center; align-items: center; font-size: 1.5em; color: #333; text-align: center; }
+#loadingOverlay .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+#selectionOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 100, 255, 0.1); z-index: 1005; cursor: crosshair; display: none; }
+#selectionRectangle { position: absolute; border: 1px dashed #007bff; background-color: rgba(0, 100, 255, 0.05); pointer-events: none; display: none; }
+#exportChoiceModal { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); background-color: white; padding: 25px; border: 1px solid #ccc; border-radius: 8px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); z-index: 10100; display: none; text-align: center; font-size: 14px; } /* Increased z-index */
+#exportChoiceModal h4 { margin-top: 0; margin-bottom: 15px; font-size: 16px; color: #333; }
+#exportChoiceModal button { padding: 8px 15px; margin: 5px; cursor: pointer; border: 1px solid #ccc; border-radius: 4px; min-width: 120px; }
+#exportChoiceModal button.export-svg { background-color: #28a745; color: white; border-color: #28a745; }
+#exportChoiceModal button.export-svg:hover { background-color: #218838; }
+#exportChoiceModal button.export-png { background-color: #007bff; color: white; border-color: #007bff; }
+#exportChoiceModal button.export-png:hover { background-color: #0056b3; }
+#exportChoiceModal button.export-cancel { background-color: #f8f9fa; color: #333; }
+#exportChoiceModal button.export-cancel:hover { background-color: #e2e6ea; }
+
+#searchIcon { position: fixed; top: 15px; right: 15px; width: 40px; height: 40px; background: rgba(255, 255, 255, 0.85); border-radius: 50%; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1001; transition: background-color 0.2s; }
+#searchIcon:hover { background-color: #f0f0f0; }
+#searchIcon i { color: #555; font-size: 18px; } /* Replaced SVG with FontAwesome for consistency if you use it elsewhere */
+/* If you stick with SVG for search icon, ensure path fill is correctly targeted if needed */
+#searchPanel { position: fixed; top: 0; left: 0; width: 100%; background: rgba(250, 250, 250, 0.92); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2); padding: 15px; z-index: 10001; transform: translateY(-100%); transition: transform 0.3s ease; display: flex; flex-direction: column; } /* Increased z-index */
+#searchPanel.expanded { transform: translateY(0); }
+.search-header { display: flex; align-items: center; margin-bottom: 10px; }
+.search-header h3 { margin: 0; flex-grow: 1; font-size: 16px; color: #333; }
+.search-header .close-search { background: none; border: none; color: #777; cursor: pointer; font-size: 20px; padding: 5px; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s; }
+.search-header .close-search:hover { color: #333; background-color: rgba(0, 0, 0, 0.05); }
+.search-container { display: flex; align-items: center; margin-bottom: 10px; }
+.search-input-container { position: relative; flex-grow: 1; margin-right: 10px; }
+#searchInput { width: 100%; padding: 8px 10px 8px 35px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; spellcheck: false; }
+.search-input-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #777; }
+.search-options { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.search-option { display: flex; align-items: center; }
+.search-option label { margin-left: 5px; font-size: 13px; color: #555; }
+.search-navigation { display: flex; align-items: center; margin-top: 5px; }
+.search-count { flex-grow: 1; font-size: 13px; color: #555; }
+.search-nav-buttons { display: flex; gap: 5px; }
+.search-nav-button { background: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; padding: 5px 10px; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
+.search-nav-button:hover { background: #e9e9e9; }
+.search-nav-button i { margin-right: 4px; }
+.search-nav-button:disabled { opacity: 0.5; cursor: not-allowed; }
+#searchStatus { font-size: 13px; color: #666; margin-top: 5px; min-height: 20px; }
+.search-keyboard-shortcuts { font-size: 12px; color: #666; margin-top: 5px; border-top: 1px solid #eee; padding-top: 5px; }
+.keyboard-shortcut { display: inline-block; background: #f5f5f5; border: 1px solid #ddd; border-radius: 3px; padding: 2px 5px; margin: 0 2px; font-family: monospace; }
+
+#addNodeFab { position: fixed; left: 210px; bottom: 30px; width: 48px; height: 48px; background: #28a745; color: #fff; border: none; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.18); font-size: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1100; transition: background 0.2s; }
+#addNodeFab:hover { background: #218838; }
+#addNodeModal { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); background: #fff; border: 1px solid #ccc; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.18); z-index: 10050; padding: 28px 24px 18px 24px; min-width: 320px; display: none; } /* Increased z-index */
+#addNodeModal h4 { margin-top: 0; margin-bottom: 12px; font-size: 17px; color: #333; }
+#addNodeModal label { display: block; margin-bottom: 4px; font-size: 13px; color: #444; }
+#addNodeModal input, #addNodeModal select { width: 100%; margin-bottom: 10px; padding: 7px 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+#addNodeModal .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+#addNodeModal button { padding: 7px 16px; border: none; border-radius: 4px; font-size: 14px; cursor: pointer; }
+#addNodeModal .add-btn { background: #28a745; color: #fff; }
+#addNodeModal .add-btn:hover { background: #218838; }
+#addNodeModal .cancel-btn { background: #eee; color: #333; }
+#addNodeModal .cancel-btn:hover { background: #ddd; }
+#addNodeModal .error { color: #b00; font-size: 13px; margin-bottom: 6px; min-height: 18px; }
+
+.tooltip-commit-button { background: #D32F2F !important; color: #fff !important; font-weight: bold; border: none; box-shadow: 0 2px 8px rgba(211,47,47,0.15); animation: pulseCommit 1.2s infinite; transition: background 0.2s; }
+.tooltip-commit-button:hover { background: #b71c1c !important; }
+@keyframes pulseCommit { 0% { box-shadow: 0 0 0 0 rgba(211,47,47,0.4); } 70% { box-shadow: 0 0 0 8px rgba(211,47,47,0.1); } 100% { box-shadow: 0 0 0 0 rgba(211,47,47,0.0); } }
+.tooltip-edit-warning { background: #fff3e0; color: #d84315; border: 1px solid #ffccbc; border-radius: 4px; padding: 7px 12px; margin-top: 10px; font-weight: bold; font-size: 13px; box-shadow: 0 2px 8px rgba(255,152,0,0.08); display: block; }
+
+.tippy-box[data-theme~='pyvis-hover'] {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px; /* Minimal font size */
+    line-height: 1.4;
+    background-color: #282c34; /* Dark, sleek background */
+    color: #abb2bf;    /* Light grey, readable text */
+    border-radius: 4px;
+    padding: 7px 12px; /* Balanced padding */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); /* Subtle shadow */
+    text-align: left;
+    max-width: 300px; /* Prevent overly wide tooltips */
+}
+
+.tippy-box[data-theme~='pyvis-hover'] .tippy-content {
+    padding: 0; 
+}
+
+.tippy-box[data-theme~='pyvis-hover'] .tippy-arrow {
+    color: #282c34; /* Arrow matches the tooltip background */
+}
+
+/* Styling for bold text (node name) inside the hover tooltip */
+.tippy-box[data-theme~='pyvis-hover'] b {
+    color: #e6efff; /* A slightly brighter, desaturated blue/white for prominence */
+    font-weight: 600;
+}
+
+/* Styling for line breaks if any still slip through (though content is simple) */
+.tippy-box[data-theme~='pyvis-hover'] br {
+    margin-bottom: 2px; /* Small space after a line break */
+}

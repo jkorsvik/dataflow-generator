@@ -4,60 +4,67 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "data-flow-generator"
-version = "0.1.5"
+version = "0.2.3"
 description = "Interactive data flow visualization tool for database dumps"
 readme = "README.md"
 authors = [{ name = "Jon-Mikkel Korsvik", email = "jkorsvik@outlook.com" }]
-license = { text = "MIT" }
+license = "MIT"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
 ]
-keywords = ["dataflow", "visualization", "vql", "denodo", "diagram"]
-requires-python = ">=3.10"
+keywords = [
+    "dataflow",
+    "visualization",
+    "vql",
+    "denodo",
+    "diagram",
+    "data-flow-generator",
+    "generator",
+]
+requires-python = ">=3.12"
 dependencies = [
     "colorama==0.4.6",
-    "narwhals==1.33.0",
-    "networkx==3.3",
+    "narwhals==1.38.1",
+    "networkx==3.4.2",
     "numpy>=2.2.4",
     "packaging>=24.2",
-    "python-dotenv==1.0.1",
+    "python-dotenv==1.1.0",
     "pyvis>=0.3.2",
-    "rapidfuzz==3.6.1",
-    "readchar==4.1.0",
+    "rapidfuzz==3.13.0",
+    "readchar==4.2.1",
     "questionary>=2.0.1",
-    "mypy>=1.15.0",
-    "pytest-cov==6.1.0",
-    "coverage-badge>=1.1.2",
-    "anybadge>=1.16.0",
     "pandas-stubs>=2.2.3.250308",
     "types-pygments>=2.19.0.20250305",
     "types-colorama>=0.4.15.20240311",
-    "types-networkx>=3.4.2.20250319",
+    "types-networkx>=3.4.2.20250507",
     "platformdirs>=4.2.2",             # Added for platform-agnostic data directory
     "sqlfluff>=3.4.0",
+    "sqlparse>=0.5.3",
+    "sqlglot[rs]>=26.16.4",
 ]
 
 [project.scripts]
-data-flow-cli = "src.dataflow:main"
-data-flow-generator = "src.dataflow:main"
-data-flow-command = "src.dataflow_command:main"
+data-flow-cli = "data_flow_generator.dataflow:main"
+data-flow-generator = "data_flow_generator.dataflow:main"
+data-flow-command = "data_flow_generator.dataflow_command:main"
 
 [project.urls]
 Homepage = "https://github.com/jkorsvik/dataflow-generator"
 Documentation = "https://github.com/jkorsvik/dataflow-generator/blob/main/README.md"
 
-[tool.setuptools]
-packages = ["src"]
-
 [tool.coverage.run]
 omit = []
 
 [project.optional-dependencies]
-dev = ["mypy>=1.15.0", "pytest>=8.3.5", "pytest-cov>=4.0"]
+dev = ["mypy>=1.15.0", "pytest>=8.3.5", "pytest-cov>=4.0", "anybadge>=1.16.0"]
 
 [dependency-groups]
-dev = ["mypy>=1.15.0", "pytest>=8.3.5", "pytest-cov>=4.0"]
+dev = ["mypy>=1.15.0", "pytest>=8.3.5", "pytest-cov>=4.0", "anybadge>=1.16.0"]
+
+# Add this section to map the src directory to the package name
+[tool.setuptools]
+package-dir = { "data_flow_generator" = "src" }
+packages = ["data_flow_generator"]

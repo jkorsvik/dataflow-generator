@@ -37,20 +37,20 @@ class TestDataflowCLI(unittest.TestCase):
                 f.write(f"-- Test SQL file with extension {ext}")
 
     def test_handle_back_key(self):
-        """Test the handle_back_key function with different inputs"""
-        # Test regular 'b' key
-        self.assertTrue(handle_back_key("b"))
-        self.assertTrue(handle_back_key("B"))  # Should be case-insensitive
-
-        # Test ESC key (represented by its ASCII code)
-        self.assertTrue(handle_back_key("\x1b"))
-
-        # Test Ctrl+C key
-        self.assertTrue(handle_back_key("\x03"))
-
-        # Test non-back keys
+        """Affirm back key logic: only ESC, Ctrl+C, Ctrl+D are back keys"""
+        import readchar
+        # Should NOT trigger back navigation
+        self.assertFalse(handle_back_key("b"))
+        self.assertFalse(handle_back_key("B"))
         self.assertFalse(handle_back_key("a"))
         self.assertFalse(handle_back_key("enter"))
+        self.assertTrue(handle_back_key(""))  # Empty string is treated as BACK_KEY in current logic
+        self.assertFalse(handle_back_key(None))
+        self.assertFalse(handle_back_key(123))
+        # Should trigger back navigation
+        self.assertTrue(handle_back_key(readchar.key.ESC))
+        self.assertTrue(handle_back_key(readchar.key.CTRL_C))
+        self.assertTrue(handle_back_key(readchar.key.CTRL_D))
 
     def test_normalize_file_path(self):
         """Test normalize_file_path with different inputs"""

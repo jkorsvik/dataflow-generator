@@ -94,10 +94,19 @@ class TestCLICore(unittest.TestCase):
         # self.assertIsNone(result)
 
     def test_handle_back_key(self):
-        """Test back key handling"""
-        self.assertTrue(handle_back_key("b"))
-        self.assertTrue(handle_back_key("B"))
+        """Affirm back key logic: only ESC, Ctrl+C, Ctrl+D are back keys"""
+        import readchar
+        # Should NOT trigger back navigation
+        self.assertFalse(handle_back_key("b"))
+        self.assertFalse(handle_back_key("B"))
         self.assertFalse(handle_back_key("x"))
+        self.assertTrue(handle_back_key(""))  # Empty string is treated as BACK_KEY in current logic
+        self.assertFalse(handle_back_key(None))
+        self.assertFalse(handle_back_key(123))
+        # Should trigger back navigation
+        self.assertTrue(handle_back_key(readchar.key.ESC))
+        self.assertTrue(handle_back_key(readchar.key.CTRL_C))
+        self.assertTrue(handle_back_key(readchar.key.CTRL_D))
 
     @patch("os.path.exists")
     @patch("os.path.isfile")

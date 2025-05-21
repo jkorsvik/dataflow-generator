@@ -1,0 +1,18 @@
+include README.md
+include LICENSE
+include pyproject.toml
+recursive-include src *.py
+recursive-include metadata *.vql
+recursive-include generated-image *.html
+recursive-include src *.css
+recursive-include src *.js
+recursive-include src *.json
+recursive-include src *.svg
+recursive-include src *.png
+recursive-include src *.jpg
+recursive-include src *.jpeg
+recursive-include src *.gif
+recursive-include src *.ico
+recursive-include src *.html
+recursive-include src *.txt
+recursive-include src *.md

@@ -40,6 +40,8 @@ jobs:
         run: uv sync --dev
       - name: Run tests
         run: uv run pytest tests/ --cov=src --cov-report=xml
+      - name: Install coverage-badge
+        run: uv pip install coverage-badge
       - name: Generate coverage badge and check threshold
         # This step generates the coverage badge using coverage.xml
         # and checks the coverage percentage using the .coverage file.

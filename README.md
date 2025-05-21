@@ -9,15 +9,38 @@
 [![JavaScript](https://img.shields.io/badge/JavaScript-ES6%2B-yellow.svg)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 
 
-This tool generates visual representations of data flows based on Denodo metadata exported in a `.vql` file. It can produce both complete data flow diagrams and focused data flow diagrams for specified views and tables.
 
+This tool generates interactive visual representations of data flows from SQL/VQL metadata. It supports various SQL dialects (initially focusing on PostgreSQL and Denodo VQL) and can produce both complete data flow diagrams and focused views for specified tables or views.
 
+### Demonstration of the tool's capabilities
+![Data Flow Generator Demo](https://github.com/jkorsvik/media_repo/raw/main/data-flow-generator/data-flow-generator-demo.avif)
+
+> **Note:** The animation above demonstrates some of the tool's features and workflow. The interactive HTML allows for node editing, search, and dynamic exploration.
+
+## Features
+
+*   **Multi-Dialect SQL Parsing:** Supports PostgreSQL, Denodo VQL, with a pluggable architecture for adding more dialects (e.g., MySQL, SQL Server, Oracle, Snowflake, SQLite).
+*   **Interactive Visualizations:** Generates HTML diagrams using Pyvis, enhanced with custom JavaScript for:
+    *   **Persistent Tooltips:** Click on a node to see detailed information, including its SQL definition with syntax highlighting (via Prism.js).
+    *   **Node Editing:** Interactively mark nodes for deletion, add/remove parent/child relationships, and commit these changes (logged to console for now, enabling backend integration).
+    *   **Search Functionality:** Fuzzy search for nodes within the graph.
+    *   **Customizable Layout:** Control panel to adjust physics, layout, and interaction settings.
+    *   **Export Options:** Export full graph or selected regions as SVG or PNG.
+*   **Diagram Types:**
+    *   **Complete Flow:** Visualizes all identified objects and their relationships.
+    *   **Focused Flow:** Shows a specific set of nodes along with their optional ancestors and descendants.
+*   **User Interfaces:**
+    *   **Interactive TUI:** A terminal-based user interface for guided file selection, database specification, and diagram options.
+    *   **Command-Line Interface (CLI):** For batch processing and integration into automated workflows.
+*   **Performance:** Optional integration with `fd`/`fdfind` for significantly faster SQL file discovery in large projects.
+*   **Database Context:** Differentiates nodes based on their source database, aiding in understanding cross-database lineage.
+*   **Extensible Parser System:** Easily add support for new SQL dialects.
 
 ## Installation
 
 ### Dependencies
 
-- Python 3.10 or higher
+- Python 3.12 or higher
 - UV package manager
 
 ### Setup
@@ -55,105 +78,73 @@ Windows (Command Prompt):
 rmdir /s /q .venv && setup.bat
 ```
 
-## Installation
+## Optional: Speed up file search with `fd`
 
-- Install from PyPI:
-```sh
-uv pip install data-flow-generator
-```
+For large projects, file discovery is much faster if the [`fd`](https://github.com/sharkdp/fd) command-line tool is installed.  
+If `fd` is not available, the tool will fall back to a pure Python implementation (which is slower for large directory trees).
 
-- Install for current user:
-```sh
-uv pip install --user data-flow-generator
-```
+**Install `fd` for your platform:**
+
+- **macOS:**  
+  `brew install fd`
+- **Debian/Ubuntu:**  
+  `sudo apt install fd-find`  
+  (You may need to use `fdfind` instead of `fd`.)
+- **Windows (with Chocolatey):**  
+  `choco install fd`
+
+If you do not install `fd`, everything will still work, but file search may be slower.
+
+
 
 ## Usage
 
-1. **Install the Tool:**
+### Interactive TUI Mode
+Simply run the command after installation or from within the activated virtual environment (if developing):
+```sh
+dataflow
+```
+The TUI will guide you through:
+1.  **File Selection:** Browse, drop/paste, search, or specify the path to your SQL/VQL metadata file.
+    *   Supports extensions: `.sql`, `.vql`, `.ddl`, `.dml`, `.hql`, `.pls`, `.plsql`, `.proc`, `.psql`, `.tsql`, `.view`.
+2.  **Main Database Selection:** If multiple databases are detected, you'll be prompted to choose a main database to normalize naming in the visualization.
+3.  **Diagram Type:**
+    *   **Complete:** Shows the entire data flow. Options to include/exclude edgeless nodes.
+    *   **Focused:** Select specific nodes to focus on. Options to include their ancestors and/or descendants.
+4.  **Auto-Open:** Choose whether to automatically open the generated HTML diagram in your browser.
 
-   You can install the tool globally using UV:
+Generated diagrams are saved in the `generated-image` folder within your application data directory (path displayed upon completion).
 
-   ```sh
-   # Install globally with UV
-   uv pip install . 
-   ```
+### Command-Line Interface (CLI) Mode
+For non-interactive use and scripting:
+```sh
+dataflow-command --metadata /path/to/your/file.sql --type complete --output /path/to/output_dir --auto-open
+```
+Or for a focused view:
+```sh
+dataflow-command --metadata /path/to/your/file.vql --type focused --focus-nodes nodeA nodeB --no-ancestors --output /path/to/output_dir
+```
+Run `dataflow-command --help` for a full list of options.
 
-   Or install for your user only:
+## Development
 
-   ```sh
-   # Install for current user
-   uv pip install --user .
-   ```
+For contributors, it's recommended to install the tool in editable mode. This allows you to modify the code and see changes immediately without reinstalling.
 
-2. **Run the Tool:**
+### Editable Installation
 
-   After installation, you can run the tool from anywhere using:
+Activate your virtual environment and run:
 
-   ```sh
-   dataflow
-   ```
+```sh
+uv pip install -e ".[dev]"
+```
 
-   The tool provides multiple ways to select your SQL file:
-   - Drop/Upload File: Simply drag and drop any SQL file into the terminal
-   - Browse SQL Files: Shows a filtered list of SQL files in the directory
-   - Specify file path: Enter or paste a file path directly
-   - Search in directory: Search for SQL files by name
+This installs the package in editable mode, making it easier to test changes during development.
 
-   Supported SQL file extensions:
-   - `.sql` - Standard SQL files
-   - `.vql` - Denodo VQL files
-   - `.ddl` - Data Definition Language
-   - `.dml` - Data Manipulation Language
-   - `.hql` - Hive Query Language
-   - `.pls`, `.plsql` - PL/SQL files
-   - `.proc` - Stored Procedures
-   - `.psql` - PostgreSQL files
-   - `.tsql` - T-SQL files
-   - `.view` - View definitions
+### Tips for Local Development
 
-   File Validation:
-   - Automatically checks for valid SQL extensions
-   - Validates file content for SQL keywords
-   - Provides option to proceed with non-SQL files after confirmation
-
-   The tool generates diagrams in the "generated-image" folder:
-   - Complete flow diagram: Shows all dependencies
-   - Focused flow diagram: Shows selected nodes and their relationships
-
-   Outputs include:
-   - PNG files for static visualization
-   - Interactive HTML files for dynamic exploration
-
-2. **Database Selection:**
-
-   The tool now analyzes database names in your metadata and prompts you to select a main database. 
-   Databases are presented in descending order by frequency, with the most common database listed first.
-
-   - The main database will be displayed without a prefix in the visualization
-   - Data Market objects are prefixed with "datamarket." (e.g., "datamarket.bv_datalake_d1300_currency_full")
-   - All other database objects are prefixed with "other."
-
-   This database differentiation is represented in the visualization legend with different colors.
-
-   ## Development
-
-   For contributors, it's recommended to install the tool in editable mode. This allows you to modify the code and see changes immediately without reinstalling.
-
-   ### Editable Installation
-
-   Activate your virtual environment and run:
-
-   ```sh
-   uv pip install -e ".[dev]"
-   ```
-
-   This installs the package in editable mode, making it easier to test changes during development.
-
-   ### Tips for Local Development
-
-   - Ensure your virtual environment is activated before running any commands.
-   - Use `pytest` to continuously run tests as you make changes.
-   - Consider setting up linting and format checking to maintain code quality.
+- Ensure your virtual environment is activated before running any commands.
+- Use `pytest` to continuously run tests as you make changes.
+- Consider setting up linting and format checking to maintain code quality.
 
 
 ## Testing
@@ -300,3 +291,5 @@ If the tool does not detect any database prefixes in your VQL file, it will:
 
 
 If you encounter any issues or need further assistance, feel free to ask us at Insight Factory, Emerging Business Technology!
+
+
