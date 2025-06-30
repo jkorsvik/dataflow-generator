@@ -34,6 +34,7 @@
 .coverage
 .pytest_cache/
 coverage.xml
+.coverage.*
 
 __pycache__/
 .venv/
