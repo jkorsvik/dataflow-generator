@@ -17,13 +17,11 @@ from . import path_utils
 import glob
 import itertools
 import threading
-import sys, webbrowser
+import sys
 import time
 from pathlib import Path
 from rapidfuzz import process
 from typing import List, Dict, Optional, Set, Tuple
-
-import threading
 
 # Add this global variable at the top of your file or before the functions
 done = False
