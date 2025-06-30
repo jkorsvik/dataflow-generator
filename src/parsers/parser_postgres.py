@@ -8,7 +8,8 @@ import sqlfluff
 from sqlglot import parse, exp
 
 
-from ..dataflow_structs import NodeInfo as NodeInfo, InvalidSQLError
+from ..dataflow_structs import NodeInfo as NodeInfo
+from ..exceptions import InvalidSQLError
 
 
 class NodeInfoPG(NodeInfo, total=False):
