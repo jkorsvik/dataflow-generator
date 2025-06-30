@@ -262,8 +262,8 @@ def parse_dump(
         cleaned_lines.append(line)
         
     content = "\n".join(cleaned_lines)
-    with open("cleaned_sql.sql", "w", encoding="utf-8") as f:
-        f.write(content)
+    # with open("cleaned_sql.sql", "w", encoding="utf-8") as f:
+    #     f.write(content)
     # Basic validation: Check if any relevant DDL patterns are present after cleaning.
     if not content or not any(re.search(pattern, content, re.IGNORECASE) for pattern in SQL_PATTERNS):
         raise InvalidSQLError("Invalid SQL or no relevant DDL statements found after cleaning.")
