@@ -23,6 +23,13 @@ from pathlib import Path
 from rapidfuzz import process
 from typing import List, Dict, Optional, Set, Tuple
 
+import threading
+
+# Add this global variable at the top of your file or before the functions
+done = False
+
+
+
 # Constants
 SQL_EXTENSIONS = [
     ".sql",  # Standard SQL files
@@ -812,12 +819,15 @@ def loading_animation():
     """
     Displays a loading animation in the terminal.
     """
+    global done
     animation = itertools.cycle(["|", "/", "-", "\\"])
     while not done:
         sys.stdout.write("\r" + next(animation))
         sys.stdout.flush()
         time.sleep(0.1)
-
+    # Clear the animation when done
+    sys.stdout.write("\r ")
+    sys.stdout.flush()
 
 def run_with_loading(func, *args, **kwargs):
     """
@@ -832,20 +842,28 @@ def run_with_loading(func, *args, **kwargs):
     func : callable
         The function to run with the loading animation.
     *args: Variable length argument list to pass to the function.
-    **kwargs: Arbitrary keyword arguments to pass to the function.
-
+    **kwargs: Keyword arguments to pass to the function.
+    
     Returns:
-    The result of the function call.
+    -------
+    The return value of the executed function.
     """
     global done
     done = False
+    
+    # Start the loading animation in a separate thread
     loading_thread = threading.Thread(target=loading_animation)
     loading_thread.daemon = True
     loading_thread.start()
-    result = func(*args, **kwargs)
-    done = True
-    loading_thread.join()
-    return result
+    
+    try:
+        # Execute the main function
+        result = func(*args, **kwargs)
+        return result
+    finally:
+        # Stop the animation
+        done = True
+        loading_thread.join(timeout=0.2)  # Wait briefly for clean shutdown
 
 
 def main():
