@@ -1,5 +1,13 @@
 ## Changelog
 
+### 0.2.5 (2025-06-30)
+
+- Improved test coverage and reliability across PostgreSQL and Denodo parsers
+- Fixed test suite issues and enhanced error handling in parser modules
+- Added comprehensive test cases for edge cases and error conditions
+- Improved mocking strategies and test infrastructure stability
+- Enhanced PostgreSQL parser test coverage and validation
+
 ### 0.2.4 (2025-05-21)
 
 - Improved Windows setup script: better error handling and feedback for virtual environment creation and activation failures

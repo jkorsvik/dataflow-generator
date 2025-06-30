@@ -15,6 +15,9 @@ function initializeSearch() {
 
     // Set up event listeners for search input only once
     if (!searchInput.dataset.initialized) {
+        // Clear any existing timeout
+        let searchTimeout;
+        
         searchInput.addEventListener("keyup", function (e) {
             if (e.key === "Enter") {
                 e.preventDefault();
@@ -31,12 +34,32 @@ function initializeSearch() {
                 return;
             }
 
-            // For other keys, update search
+            // For other keys, debounce the search
             const query = searchInput.value.trim();
             if (query !== currentSearchQuery) {
-                performSearch(query);
+                // Clear previous timeout
+                if (searchTimeout) {
+                    clearTimeout(searchTimeout);
+                }
+                
+                // Set new timeout for debounced search
+                searchTimeout = setTimeout(() => {
+                    performSearch(query);
+                }, 300); // 300ms debounce delay
             }
         });
+        
+        // Also add input event for immediate feedback on certain keys
+        searchInput.addEventListener("input", function (e) {
+            const query = searchInput.value.trim();
+            
+            // Clear search immediately if input is empty
+            if (!query && currentSearchQuery) {
+                clearTimeout(searchTimeout);
+                performSearch("");
+            }
+        });
+        
         searchInput.dataset.initialized = "true"; // Mark as initialized
     }
 
@@ -79,23 +102,118 @@ function initializeSearchEngine() {
 function createFuseInstance(nodes) {
     const searchableNodes = nodes.map((node) => {
         const fullDetails = extractInfoFromTooltip(node.title || "");
+        const baseLabel = node.label || node.id.toString();
+        
         return {
             id: node.id,
-            label: node.label || node.id.toString(), // Ensure label is a string
+            label: baseLabel,
+            normalizedLabel: normalizeSearchText(baseLabel),
+            searchVariants: createSearchVariants(baseLabel),
             ...fullDetails,
+            normalizedFullName: normalizeSearchText(fullDetails.fullName || ""),
+            normalizedType: normalizeSearchText(fullDetails.type || ""),
+            normalizedDatabase: normalizeSearchText(fullDetails.database || ""),
         };
     });
 
     searchFuseInstance = new Fuse(searchableNodes, {
-        keys: ["label", "fullName", "type", "database"],
+        keys: [
+            { name: "label", weight: 1.0 },
+            { name: "normalizedLabel", weight: 0.9 },
+            { name: "searchVariants", weight: 0.8 },
+            { name: "fullName", weight: 0.9 },
+            { name: "normalizedFullName", weight: 0.8 },
+            { name: "type", weight: 0.6 },
+            { name: "normalizedType", weight: 0.5 },
+            { name: "database", weight: 0.5 },
+            { name: "normalizedDatabase", weight: 0.4 },
+        ],
         includeScore: true,
-        threshold: 0.4, // Default fuzzy
+        threshold: 0.3, // More lenient for better fuzzy matching
         ignoreLocation: true,
-        useExtendedSearch: true, // Allows for more complex queries if needed later
+        useExtendedSearch: true,
+        ignoreFieldNorm: true, // Ignore field length normalization for better scoring
+        fieldNormWeight: 0.2, // Reduce field length impact
+        minMatchCharLength: 1, // Allow single character matches
+        shouldSort: true,
+        sortFn: (a, b) => {
+            // Custom sorting: prioritize lower scores (better matches)
+            // But also consider exact matches and special character matches
+            const scoreA = a.score || 0;
+            const scoreB = b.score || 0;
+            
+            // If scores are very close, prefer shorter matches
+            if (Math.abs(scoreA - scoreB) < 0.1) {
+                const lenA = a.item.label?.length || 0;
+                const lenB = b.item.label?.length || 0;
+                return lenA - lenB;
+            }
+            
+            return scoreA - scoreB;
+        }
     });
 
     if (searchStatus) searchStatus.textContent = "Search engine ready.";
-    console.log("Fuse.js instance created with " + searchableNodes.length + " nodes.");
+    console.log("Enhanced Fuse.js instance created with " + searchableNodes.length + " nodes.");
+}
+
+// Utility function to normalize search text for better fuzzy matching
+function normalizeSearchText(text) {
+    if (!text || typeof text !== 'string') return "";
+    
+    return text
+        .toLowerCase()
+        .trim()
+        // Replace special characters with spaces for normalization
+        .replace(/[_\-@\.]/g, ' ')
+        // Remove multiple spaces
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+// Create search variants for better matching
+function createSearchVariants(text) {
+    if (!text || typeof text !== 'string') return [];
+    
+    const variants = [];
+    const baseText = text.trim();
+    
+    // Original text
+    variants.push(baseText);
+    
+    // Lowercase version
+    variants.push(baseText.toLowerCase());
+    
+    // Version with special characters replaced by spaces
+    variants.push(baseText.replace(/[_\-@\.]/g, ' '));
+    
+    // Version with special characters removed
+    variants.push(baseText.replace(/[_\-@\.\s]/g, ''));
+    
+    // Version with underscores and dashes as spaces
+    variants.push(baseText.replace(/[_\-]/g, ' '));
+    
+    // Mixed separator versions for common patterns
+    if (baseText.includes('_')) {
+        variants.push(baseText.replace(/_/g, '-'));
+        variants.push(baseText.replace(/_/g, '.'));
+        variants.push(baseText.replace(/_/g, '@'));
+    }
+    
+    if (baseText.includes('-')) {
+        variants.push(baseText.replace(/-/g, '_'));
+        variants.push(baseText.replace(/-/g, '.'));
+        variants.push(baseText.replace(/-/g, '@'));
+    }
+    
+    if (baseText.includes('.')) {
+        variants.push(baseText.replace(/\./g, '_'));
+        variants.push(baseText.replace(/\./g, '-'));
+        variants.push(baseText.replace(/\./g, '@'));
+    }
+    
+    // Remove duplicates and empty strings
+    return [...new Set(variants)].filter(v => v && v.length > 0);
 }
 
 function extractInfoFromTooltip(tooltipHtml) {
@@ -169,18 +287,82 @@ function performSearch(query) {
     const isCaseSensitive = document.getElementById("searchCaseSensitive")?.checked || false;
     const isFuzzy = document.getElementById("searchFuzzy")?.checked ?? true; // Default to fuzzy
 
-    const fuseOptions = {
-        threshold: isFuzzy ? 0.4 : 0.0, // 0.0 for exact match
-        ignoreCase: !isCaseSensitive, // Fuse's ignoreCase is true by default
+    // Enhanced search with better fuzzy options
+    const searchOptions = {
+        threshold: isFuzzy ? 0.3 : 0.0, // More lenient threshold for fuzzy search
+        ignoreCase: !isCaseSensitive,
+        includeScore: true,
+        findAllMatches: true, // Find all matches, not just the first
+        minMatchCharLength: 1,
+        shouldSort: true,
+        location: 0, // Start search from beginning
+        distance: 100, // How far from location to search
     };
 
-    const results = searchFuseInstance.search(query, fuseOptions);
-    currentSearchResults = results.map((result) => result.item.id);
+    // Create multiple search queries for better matching
+    const searchQueries = [query];
+    
+    // Add normalized version of the query
+    const normalizedQuery = normalizeSearchText(query);
+    if (normalizedQuery !== query.toLowerCase()) {
+        searchQueries.push(normalizedQuery);
+    }
+    
+    // Add variants of the query
+    const queryVariants = createSearchVariants(query);
+    searchQueries.push(...queryVariants.slice(0, 3)); // Limit to top 3 variants to avoid performance issues
+
+    // Perform searches and combine results
+    let allResults = [];
+    const uniqueIds = new Set();
+
+    for (const searchQuery of searchQueries) {
+        if (!searchQuery || searchQuery.length === 0) continue;
+        
+        const results = searchFuseInstance.search(searchQuery, searchOptions);
+        
+        // Add results that haven't been seen yet
+        results.forEach(result => {
+            if (!uniqueIds.has(result.item.id)) {
+                uniqueIds.add(result.item.id);
+                allResults.push(result);
+            }
+        });
+    }
+
+    // Sort results by score (lower is better) and relevance
+    allResults.sort((a, b) => {
+        const scoreA = a.score || 0;
+        const scoreB = b.score || 0;
+        
+        // Prefer exact matches
+        if (scoreA === 0 && scoreB > 0) return -1;
+        if (scoreB === 0 && scoreA > 0) return 1;
+        
+        // Then by score
+        if (Math.abs(scoreA - scoreB) > 0.1) {
+            return scoreA - scoreB;
+        }
+        
+        // If scores are close, prefer shorter labels
+        const lenA = a.item.label?.length || 0;
+        const lenB = b.item.label?.length || 0;
+        return lenA - lenB;
+    });
+
+    currentSearchResults = allResults.map(result => result.item.id);
 
     if (currentSearchResults.length > 0) {
         currentSearchResultIndex = 0;
         highlightSearchResults();
         focusOnCurrentResult();
+        if (searchStatus) {
+            const exactMatches = allResults.filter(r => (r.score || 0) === 0).length;
+            const statusText = exactMatches > 0 
+                ? `Found ${currentSearchResults.length} results (${exactMatches} exact) for "${query}"`
+                : `Found ${currentSearchResults.length} results for "${query}"`;
+            searchStatus.textContent = statusText;
+        }
     } else {
         if (searchStatus) searchStatus.textContent = `No matches found for "${query}"`;
     }
@@ -232,20 +414,134 @@ function focusOnCurrentResult() {
     const nodeId = currentSearchResults[currentSearchResultIndex];
     if (!nodeId) return;
 
-    const options = {
-        scale: window.network.getScale() > 1.5 ? window.network.getScale() : 1.5, // Zoom in, but not too much if already zoomed
-        offset: { x: 0, y: 0 },
-        animation: {
-            duration: 500,
-            easingFunction: "easeInOutQuad",
-        },
-    };
-
     try {
-        window.network.focus(nodeId, options);
-        window.network.selectNodes([nodeId], { highlightEdges: false });
+        // Get current network state
+        const currentScale = window.network.getScale();
+        const viewPosition = window.network.getViewPosition();
+        
+        // Calculate optimal zoom level based on network density and current zoom
+        const optimalScale = calculateOptimalZoom(currentScale, nodeId);
+        
+        // Get node position for perfect centering
+        const nodePosition = window.network.getPositions([nodeId])[nodeId];
+        if (!nodePosition) {
+            console.warn("Node position not found for:", nodeId);
+            return;
+        }
+
+        // Enhanced focus options for smooth centering
+        const focusOptions = {
+            scale: optimalScale,
+            offset: { x: 0, y: 0 }, // Perfect center
+            animation: {
+                duration: 600, // Slightly longer for smoother feel
+                easingFunction: "easeInOutCubic", // Smoother easing
+            },
+        };
+
+        // Focus on the node with enhanced centering
+        window.network.focus(nodeId, focusOptions);
+        
+        // Select the node with visual feedback
+        window.network.selectNodes([nodeId], { 
+            highlightEdges: false,
+            unselectAll: true // Clear any previous selections
+        });
+
+        // Add a slight delay before final positioning to ensure smooth animation
+        setTimeout(() => {
+            try {
+                // Ensure the node is perfectly centered after animation
+                const currentViewPos = window.network.getViewPosition();
+                const canvasSize = window.network.body.view.canvas.frame.canvas;
+                const centerX = canvasSize.width / 2;
+                const centerY = canvasSize.height / 2;
+                
+                // Fine-tune position if needed (only if significantly off-center)
+                const screenPos = window.network.canvasToDOM(nodePosition);
+                const offsetX = centerX - screenPos.x;
+                const offsetY = centerY - screenPos.y;
+                
+                if (Math.abs(offsetX) > 10 || Math.abs(offsetY) > 10) {
+                    window.network.moveTo({
+                        position: {
+                            x: currentViewPos.x - offsetX / currentScale,
+                            y: currentViewPos.y - offsetY / currentScale
+                        },
+                        scale: currentScale,
+                        animation: {
+                            duration: 200,
+                            easingFunction: "easeOutQuad"
+                        }
+                    });
+                }
+            } catch (e) {
+                // Ignore fine-tuning errors, main focus should have worked
+                console.debug("Fine-tuning focus position failed:", e);
+            }
+        }, 650); // After main animation completes
+
     } catch (e) {
         console.warn("Error focusing on node:", nodeId, e);
+        
+        // Fallback to basic focus if enhanced version fails
+        try {
+            window.network.focus(nodeId, {
+                scale: 1.5,
+                animation: { duration: 500 }
+            });
+            window.network.selectNodes([nodeId]);
+        } catch (fallbackError) {
+            console.error("Fallback focus also failed:", fallbackError);
+        }
+    }
+}
+
+// Calculate optimal zoom level for focusing on a node
+function calculateOptimalZoom(currentScale, nodeId) {
+    try {
+        // Get network statistics for intelligent zooming
+        const nodes = window.network.body.data.nodes.get();
+        const edges = window.network.body.data.edges.get();
+        
+        if (!nodes || nodes.length === 0) return Math.max(currentScale, 1.5);
+        
+        // Calculate network density
+        const nodeCount = nodes.length;
+        const edgeCount = edges ? edges.length : 0;
+        const density = nodeCount > 1 ? edgeCount / (nodeCount * (nodeCount - 1)) : 0;
+        
+        // Get canvas size
+        const canvas = window.network.body.view.canvas.frame.canvas;
+        const canvasArea = canvas.width * canvas.height;
+        
+        // Base zoom calculation
+        let targetScale = currentScale;
+        
+        // For dense networks, zoom in more to focus on the specific area
+        if (density > 0.1) {
+            targetScale = Math.max(2.0, currentScale * 1.2);
+        } else if (density > 0.05) {
+            targetScale = Math.max(1.8, currentScale * 1.1);
+        } else {
+            targetScale = Math.max(1.5, currentScale);
+        }
+        
+        // Adjust based on canvas size - smaller screens need more zoom
+        if (canvasArea < 500000) { // Small screen
+            targetScale *= 1.2;
+        } else if (canvasArea > 2000000) { // Large screen
+            targetScale *= 0.9;
+        }
+        
+        // Cap the zoom levels for usability
+        targetScale = Math.min(Math.max(targetScale, 1.0), 4.0);
+        
+        return targetScale;
+        
+    } catch (e) {
+        console.warn("Error calculating optimal zoom:", e);
+        return Math.max(currentScale, 1.5); // Safe fallback
     }
 }
 
