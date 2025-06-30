@@ -28,9 +28,9 @@ def parse_dump(
 
 def draw_complete_data_flow(
     edges, node_types, save_path="", file_name="", draw_edgeless=False, auto_open=False
-) -> None:
+) -> Union[None, str]:
     print(f"Generating complete data flow{' for ' + file_name if file_name else ''}...")
-    pyvis_mod.draw_pyvis_html(
+    return pyvis_mod.draw_pyvis_html(
         edges,
         node_types,
         save_path=save_path,
