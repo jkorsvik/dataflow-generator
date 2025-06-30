@@ -222,6 +222,7 @@ function handleNodeEditAction(event) {
             if (parentIdToRemove) {
                 if (!nodeEditState.removeParents.includes(parentIdToRemove)) {
                     nodeEditState.removeParents.push(parentIdToRemove);
+                    console.log(`[DEBUG] Added parent ${parentIdToRemove} to removal list for node ${nodeId}`);
                 }
             } else {
                 console.warn("Remove parent action called without a specific ID.");
@@ -233,6 +234,7 @@ function handleNodeEditAction(event) {
             if (childIdToRemove) {
                 if (!nodeEditState.removeChildren.includes(childIdToRemove)) {
                     nodeEditState.removeChildren.push(childIdToRemove);
+                    console.log(`[DEBUG] Added child ${childIdToRemove} to removal list for node ${nodeId}`);
                 }
             } else {
                 console.warn("Remove child action called without a specific ID.");
@@ -331,7 +333,13 @@ function updateEditUI() {
                 if (item.specialHandler) {
                     item.specialHandler(icon);
                 } else {
-                    handleNodeEditAction({ target: { dataset: { action: item.action, id: icon.dataset.id } } });
+                    // Create a proper event object that handleNodeEditAction expects
+                    const fakeEvent = {
+                        stopPropagation: () => {},
+                        preventDefault: () => {},
+                        target: { dataset: { action: item.action, id: icon.dataset.id } }
+                    };
+                    handleNodeEditAction(fakeEvent);
                 }
             };
         });

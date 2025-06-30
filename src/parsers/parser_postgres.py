@@ -70,14 +70,18 @@ def add_node(
     # Type casting to NodeInfoPG for type checker, assuming dict matches NodeInfoPG structure.
     existing_info = node_types.get(full_name)
     # Initialize or reuse a single info dict, including DDL parts and initial definition
-    info: NodeInfoPG = existing_info if existing_info else {
-        "constraints": [],
-        "definition_parts": [],
-        "type": node_type,
-        "database": schema or "",
-        "full_name": full_name,
-        "definition": None
-    }  # type: ignore
+    if existing_info is not None:
+        info: NodeInfoPG = existing_info
+    else:
+        from typing import cast
+        info = cast(NodeInfoPG, {
+            "constraints": [],
+            "definition_parts": [],
+            "type": node_type,
+            "database": schema or "",
+            "full_name": full_name,
+            "definition": None
+        })
 
     # Append the new DDL segment
     if definition:

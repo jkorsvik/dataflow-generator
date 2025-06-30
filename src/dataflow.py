@@ -6,7 +6,6 @@ from colorama import init, Fore, Style, Back
 import shutil
 import subprocess
 import platform
-import json
 # Fall back to relative import (when running from source)
 from .generate_data_flow import (
     draw_focused_data_flow,
@@ -14,14 +13,13 @@ from .generate_data_flow import (
     parse_dump,
 )
 from . import path_utils
-import glob
 import itertools
 import threading
 import sys
 import time
 from pathlib import Path
 from rapidfuzz import process
-from typing import List, Dict, Optional, Set, Tuple
+from typing import List, Dict, Optional, Set, Tuple, Union
 
 # Add this global variable at the top of your file or before the functions
 done = False
@@ -55,7 +53,7 @@ CTRL_D_KEY = readchar.key.CTRL_D
 BACK_TOOLTIP = "(press Esc to go back)"
 
 
-def handle_back_key(key: str) -> bool:
+def handle_back_key(key: Union[str, None, int]) -> bool:
     """Check if back navigation is requested
 
     Handles multiple ways to go back:
@@ -66,16 +64,24 @@ def handle_back_key(key: str) -> bool:
     - KeyboardInterrupt exceptions
 
     Args:
-        key (str): Key pressed by user
+        key (Union[str, None, int]): Key pressed by user
 
     Returns:
         bool: True if back navigation requested
     """
 
+    # Handle non-string inputs
+    if key is None or isinstance(key, int):
+        return False
+
     # Check if key is the designated back key or special escape keys
     # Always convert to lowercase for case-insensitive comparison
     if isinstance(key, str):
         key = key.lower() if len(key) == 1 else key
+    else:
+        # If key is not a string, assume it's a special key object
+        # (like readchar.key.ESC, etc.)
+        pass
     return key in [BACK_KEY, ESC_KEY, CTRL_C_KEY, CTRL_D_KEY]
 
 def check_or_install_fd():
